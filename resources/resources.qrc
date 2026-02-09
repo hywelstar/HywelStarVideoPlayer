@@ -1,0 +1,23 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/icons">
+        <file alias="play">icons/play.svg</file>
+        <file alias="pause">icons/pause.svg</file>
+        <file alias="stop">icons/stop.svg</file>
+        <file alias="record">icons/record.svg</file>
+        <file alias="screenshot">icons/screenshot.svg</file>
+        <file alias="grid">icons/grid.svg</file>
+        <file alias="volume">icons/volume.svg</file>
+        <file alias="volume_mute">icons/volume_mute.svg</file>
+        <file alias="connect">icons/connect.svg</file>
+        <file alias="disconnect">icons/disconnect.svg</file>
+        <file alias="stream">icons/stream.svg</file>
+        <file alias="upload">icons/upload.svg</file>
+        <file alias="settings">icons/settings.svg</file>
+        <file alias="expand">icons/expand.svg</file>
+        <file alias="collapse">icons/collapse.svg</file>
+        <file alias="fullscreen">icons/fullscreen.svg</file>
+        <file alias="fullscreen_exit">icons/fullscreen_exit.svg</file>
+        <file alias="app_icon">icons/app_icon.svg</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a237e"/>
+      <stop offset="100%" style="stop-color:#0d47a1"/>
+    </linearGradient>
+    <linearGradient id="star" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffd54f"/>
+      <stop offset="100%" style="stop-color:#ffb300"/>
+    </linearGradient>
+    <linearGradient id="play" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4caf50"/>
+      <stop offset="100%" style="stop-color:#2e7d32"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#bg)"/>
+  <!-- Outer ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#42a5f5" stroke-width="8"/>
+  <!-- Star -->
+  <path d="M256 80 l30 90 95 0 -75 55 30 90 -80 -60 -80 60 30 -90 -75 -55 95 0 z" fill="url(#star)"/>
+  <!-- Play button circle -->
+  <circle cx="256" cy="320" r="80" fill="rgba(255,255,255,0.15)"/>
+  <!-- Play triangle -->
+  <path d="M230 280 l70 40 -70 40 z" fill="url(#play)"/>
+</svg>

@@ -1,0 +1,237 @@
+/**
+ * @file MainWindow.cpp
+ * @brief Main application window implementation
+ * @author hywelstar
+ * @email hywelstar@126.com
+ * @date 2026
+ * @copyright MIT License
+ */
+
+#include "MainWindow.h"
+#include "ui/VideoDisplayWidget.h"
+#include "ui/ControlBar.h"
+#include "ui/StatusBar.h"
+#include "ui/QuickConnectBar.h"
+#include "core/GStreamerEngine.h"
+#include "core/RecordingManager.h"
+#include "core/ConfigManager.h"
+#include "utils/Logger.h"
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QKeyEvent>
+#include <QCloseEvent>
+#include <QImage>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , videoWidget(std::make_unique<VideoDisplayWidget>())
+    , controlBar(std::make_unique<ControlBar>())
+    , statusBar(std::make_unique<StatusBar>())
+    , quickConnectBar(std::make_unique<QuickConnectBar>())
+    , gstreamerEngine(std::make_unique<GStreamerEngine>())
+    , recordingManager(std::make_unique<RecordingManager>())
+    , configManager(std::make_unique<ConfigManager>())
+{
+    Logger::instance().info("MainWindow: Initializing main window...");
+    setWindowTitle("Hywel Star Video Player");
+    setWindowIcon(QIcon(":/icons/app.png"));
+    resize(1280, 720);
+
+    setupUI();
+    connectSignals();
+    loadSettings();
+    Logger::instance().info("MainWindow: Initialization complete");
+}
+
+MainWindow::~MainWindow() {
+    Logger::instance().info("MainWindow: Shutting down...");
+    saveSettings();
+}
+
+void MainWindow::setupUI() {
+    QWidget *centralWidget = new QWidget(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0);
+
+    // Add quick connect bar
+    mainLayout->addWidget(quickConnectBar.get());
+
+    // Add video display widget
+    mainLayout->addWidget(videoWidget.get(), 1);
+
+    // Add control bar
+    mainLayout->addWidget(controlBar.get());
+
+    // Add status bar
+    setStatusBar(statusBar.get());
+
+    setCentralWidget(centralWidget);
+
+    // Set window handle for GStreamer
+    gstreamerEngine->setWindowHandle((WId)videoWidget->winId());
+}
+
+void MainWindow::connectSignals() {
+    // Quick connect bar signals
+    connect(quickConnectBar.get(), &QuickConnectBar::connectRequested,
+            this, &MainWindow::onConnect);
+    connect(quickConnectBar.get(), &QuickConnectBar::disconnectRequested,
+            this, &MainWindow::onDisconnect);
+
+    // Control bar signals
+    connect(controlBar.get(), &ControlBar::playRequested,
+            this, &MainWindow::onPlay);
+    connect(controlBar.get(), &ControlBar::pauseRequested,
+            this, &MainWindow::onPause);
+    connect(controlBar.get(), &ControlBar::stopRequested,
+            this, &MainWindow::onStop);
+    connect(controlBar.get(), &ControlBar::recordingRequested,
+            this, &MainWindow::onStartRecording);
+    connect(controlBar.get(), &ControlBar::recordingStopRequested,
+            this, &MainWindow::onStopRecording);
+    connect(controlBar.get(), &ControlBar::screenshotRequested,
+            this, &MainWindow::onScreenshot);
+    connect(controlBar.get(), &ControlBar::volumeChanged,
+            this, &MainWindow::onVolumeChanged);
+
+    // Video display widget signals
+    connect(videoWidget.get(), &VideoDisplayWidget::fullScreenRequested,
+            this, &MainWindow::onToggleFullScreen);
+    connect(videoWidget.get(), &VideoDisplayWidget::gridToggleRequested,
+            this, &MainWindow::onToggleGrid);
+
+    // GStreamer engine signals
+    connect(gstreamerEngine.get(), QOverload<int, int, int, int>::of(&GStreamerEngine::streamInfoChanged),
+            this, &MainWindow::onStreamInfoChanged);
+    connect(gstreamerEngine.get(), QOverload<PlayerState>::of(&GStreamerEngine::stateChanged),
+            this, [this](PlayerState state) { onPlayerStateChanged((int)state); });
+    connect(gstreamerEngine.get(), &GStreamerEngine::errorOccurred,
+            this, &MainWindow::onErrorOccurred);
+}
+
+void MainWindow::onConnect(const QString &uri) {
+    Logger::instance().info(QString("MainWindow: Connecting to: %1").arg(uri));
+    gstreamerEngine->play(uri);
+}
+
+void MainWindow::onDisconnect() {
+    Logger::instance().info("MainWindow: Disconnecting...");
+    gstreamerEngine->stop();
+}
+
+void MainWindow::onPlay() {
+    Logger::instance().info("MainWindow: Play requested");
+    gstreamerEngine->play("");
+}
+
+void MainWindow::onPause() {
+    Logger::instance().info("MainWindow: Pause requested");
+    gstreamerEngine->pause();
+}
+
+void MainWindow::onStop() {
+    Logger::instance().info("MainWindow: Stop requested");
+    gstreamerEngine->stop();
+}
+
+void MainWindow::onStartRecording() {
+    QString filepath = recordingManager->generateFilename();
+    Logger::instance().info(QString("MainWindow: Starting recording to: %1").arg(filepath));
+    gstreamerEngine->startRecording(filepath);
+    recordingManager->startRecording("mkv", "high");
+}
+
+void MainWindow::onStopRecording() {
+    Logger::instance().info("MainWindow: Stopping recording");
+    gstreamerEngine->stopRecording();
+    recordingManager->stopRecording();
+}
+
+void MainWindow::onScreenshot() {
+    Logger::instance().info("MainWindow: Screenshot requested");
+
+    // Capture frame from GStreamer pipeline
+    QImage frame = gstreamerEngine->captureFrame();
+
+    if (frame.isNull()) {
+        Logger::instance().error("MainWindow: Failed to capture frame from GStreamer");
+        statusBar->showError("Failed to capture screenshot");
+        return;
+    }
+
+    // Generate filename and save
+    QString filepath = recordingManager->generateScreenshotFilename();
+    if (frame.save(filepath, "PNG")) {
+        Logger::instance().info(QString("MainWindow: Screenshot saved to: %1").arg(filepath));
+        statusBar->updateConnectionStatus(QString("Screenshot saved"));
+    } else {
+        Logger::instance().error(QString("MainWindow: Failed to save screenshot to: %1").arg(filepath));
+        statusBar->showError("Failed to save screenshot");
+    }
+}
+
+void MainWindow::onToggleFullScreen() {
+    if (isFullScreen) {
+        Logger::instance().debug("MainWindow: Exiting fullscreen");
+        showNormal();
+        isFullScreen = false;
+    } else {
+        Logger::instance().debug("MainWindow: Entering fullscreen");
+        showFullScreen();
+        isFullScreen = true;
+    }
+}
+
+void MainWindow::onToggleGrid() {
+    videoWidget->toggleGrid();
+}
+
+void MainWindow::onVolumeChanged(int volume) {
+    gstreamerEngine->setVolume(volume);
+}
+
+void MainWindow::onStreamInfoChanged(int width, int height, int fps, int bitrate) {
+    statusBar->updateStreamInfo(width, height, fps, bitrate);
+}
+
+void MainWindow::onPlayerStateChanged(int state) {
+    // Update UI based on player state
+}
+
+void MainWindow::onErrorOccurred(const QString &error) {
+    Logger::instance().error(QString("MainWindow: Error occurred: %1").arg(error));
+    statusBar->showError(error);
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_F) {
+        onToggleFullScreen();
+    } else if (event->key() == Qt::Key_Space) {
+        // Toggle play/pause
+    } else if (event->key() == Qt::Key_R) {
+        // Toggle recording
+    } else if (event->key() == Qt::Key_S) {
+        onScreenshot();
+    } else if (event->key() == Qt::Key_G) {
+        onToggleGrid();
+    } else if (event->key() == Qt::Key_Q) {
+        close();
+    } else {
+        QMainWindow::keyPressEvent(event);
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    saveSettings();
+    gstreamerEngine->stop();
+    event->accept();
+}
+
+void MainWindow::loadSettings() {
+    // Load settings from config manager
+}
+
+void MainWindow::saveSettings() {
+    // Save settings to config manager
+}
