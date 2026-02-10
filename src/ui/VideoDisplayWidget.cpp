@@ -80,6 +80,12 @@ void VideoDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
     }
 }
 
+void VideoDisplayWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        emit fullScreenRequested();
+    }
+}
+
 void VideoDisplayWidget::keyPressEvent(QKeyEvent *event) {
     switch (event->key()) {
     case Qt::Key_Plus:

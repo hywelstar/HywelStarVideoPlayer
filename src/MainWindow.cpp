@@ -32,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
     , gstreamerEngine(std::make_unique<GStreamerEngine>())
     , recordingManager(std::make_unique<RecordingManager>())
     , configManager(std::make_unique<ConfigManager>())
+    , recordingTimer(new QTimer(this))
 {
     Logger::instance().info("MainWindow: Initializing main window...");
     setWindowTitle("Hywel Star Video Player");
@@ -41,6 +42,10 @@ MainWindow::MainWindow(QWidget *parent)
     setupUI();
     connectSignals();
     loadSettings();
+
+    // Setup recording timer
+    connect(recordingTimer, &QTimer::timeout, this, &MainWindow::updateRecordingTime);
+
     Logger::instance().info("MainWindow: Initialization complete");
 }
 
@@ -146,6 +151,10 @@ void MainWindow::onStartRecording() {
     gstreamerEngine->startRecording(filepath);
     recordingManager->startRecording("mkv", "high");
     controlBar->setRecordingActive(true);
+
+    // Start recording timer
+    recordingElapsed.start();
+    recordingTimer->start(1000);
 }
 
 void MainWindow::onStopRecording() {
@@ -153,6 +162,16 @@ void MainWindow::onStopRecording() {
     gstreamerEngine->stopRecording();
     recordingManager->stopRecording();
     controlBar->setRecordingActive(false);
+
+    // Stop recording timer
+    recordingTimer->stop();
+    controlBar->setRecordingTime(0);
+}
+
+void MainWindow::updateRecordingTime() {
+    if (gstreamerEngine->isRecording()) {
+        controlBar->setRecordingTime(recordingElapsed.elapsed());
+    }
 }
 
 void MainWindow::onScreenshot() {

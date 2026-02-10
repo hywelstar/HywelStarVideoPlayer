@@ -11,6 +11,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTimer>
+#include <QElapsedTimer>
 #include <memory>
 
 class VideoDisplayWidget;
@@ -47,6 +49,7 @@ private slots:
     void onStreamInfoChanged(int width, int height, int fps, int bitrate);
     void onPlayerStateChanged(int state);
     void onErrorOccurred(const QString &error);
+    void updateRecordingTime();
 
 private:
     void setupUI();
@@ -62,6 +65,8 @@ private:
     std::unique_ptr<RecordingManager> recordingManager;
     std::unique_ptr<ConfigManager> configManager;
 
+    QTimer *recordingTimer;
+    QElapsedTimer recordingElapsed;
     bool isFullScreen = false;
 };
 
