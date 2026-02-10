@@ -82,13 +82,6 @@ void VideoDisplayWidget::mouseReleaseEvent(QMouseEvent *event) {
 
 void VideoDisplayWidget::keyPressEvent(QKeyEvent *event) {
     switch (event->key()) {
-    case Qt::Key_F:
-        emit fullScreenRequested();
-        break;
-    case Qt::Key_G:
-        emit gridToggleRequested();
-        toggleGrid();
-        break;
     case Qt::Key_Plus:
     case Qt::Key_Equal:
         zoom(1);
@@ -97,6 +90,7 @@ void VideoDisplayWidget::keyPressEvent(QKeyEvent *event) {
         zoom(-1);
         break;
     default:
+        // Pass all other keys to parent (MainWindow handles global shortcuts)
         QWidget::keyPressEvent(event);
     }
 }

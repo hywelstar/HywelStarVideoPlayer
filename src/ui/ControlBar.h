@@ -33,6 +33,7 @@ signals:
     void recordingStopRequested();
     void screenshotRequested();
     void fullscreenRequested();
+    void gridToggleRequested();
     void volumeChanged(int volume);
 
 private:

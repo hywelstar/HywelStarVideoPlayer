@@ -21,6 +21,7 @@
 #include <QKeyEvent>
 #include <QCloseEvent>
 #include <QImage>
+#include <QSettings>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -92,6 +93,10 @@ void MainWindow::connectSignals() {
             this, &MainWindow::onStopRecording);
     connect(controlBar.get(), &ControlBar::screenshotRequested,
             this, &MainWindow::onScreenshot);
+    connect(controlBar.get(), &ControlBar::fullscreenRequested,
+            this, &MainWindow::onToggleFullScreen);
+    connect(controlBar.get(), &ControlBar::gridToggleRequested,
+            this, &MainWindow::onToggleGrid);
     connect(controlBar.get(), &ControlBar::volumeChanged,
             this, &MainWindow::onVolumeChanged);
 
@@ -140,12 +145,14 @@ void MainWindow::onStartRecording() {
     Logger::instance().info(QString("MainWindow: Starting recording to: %1").arg(filepath));
     gstreamerEngine->startRecording(filepath);
     recordingManager->startRecording("mkv", "high");
+    controlBar->setRecordingActive(true);
 }
 
 void MainWindow::onStopRecording() {
     Logger::instance().info("MainWindow: Stopping recording");
     gstreamerEngine->stopRecording();
     recordingManager->stopRecording();
+    controlBar->setRecordingActive(false);
 }
 
 void MainWindow::onScreenshot() {
@@ -174,13 +181,20 @@ void MainWindow::onScreenshot() {
 void MainWindow::onToggleFullScreen() {
     if (isFullScreen) {
         Logger::instance().debug("MainWindow: Exiting fullscreen");
+        quickConnectBar->show();
+        controlBar->show();
+        statusBar->show();
         showNormal();
         isFullScreen = false;
     } else {
         Logger::instance().debug("MainWindow: Entering fullscreen");
+        quickConnectBar->hide();
+        controlBar->hide();
+        statusBar->hide();
         showFullScreen();
         isFullScreen = true;
     }
+    controlBar->setFullscreen(isFullScreen);
 }
 
 void MainWindow::onToggleGrid() {
@@ -196,7 +210,21 @@ void MainWindow::onStreamInfoChanged(int width, int height, int fps, int bitrate
 }
 
 void MainWindow::onPlayerStateChanged(int state) {
-    // Update UI based on player state
+    PlayerState playerState = static_cast<PlayerState>(state);
+    switch (playerState) {
+    case PlayerState::Playing:
+        statusBar->updateConnectionStatus("Playing");
+        break;
+    case PlayerState::Paused:
+        statusBar->updateConnectionStatus("Paused");
+        break;
+    case PlayerState::Stopped:
+        statusBar->updateConnectionStatus("Stopped");
+        break;
+    case PlayerState::Error:
+        statusBar->updateConnectionStatus("Error");
+        break;
+    }
 }
 
 void MainWindow::onErrorOccurred(const QString &error) {
@@ -205,19 +233,39 @@ void MainWindow::onErrorOccurred(const QString &error) {
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
-    if (event->key() == Qt::Key_F) {
+    switch (event->key()) {
+    case Qt::Key_F:
         onToggleFullScreen();
-    } else if (event->key() == Qt::Key_Space) {
-        // Toggle play/pause
-    } else if (event->key() == Qt::Key_R) {
-        // Toggle recording
-    } else if (event->key() == Qt::Key_S) {
+        break;
+    case Qt::Key_Escape:
+        if (isFullScreen) {
+            onToggleFullScreen();
+        }
+        break;
+    case Qt::Key_Space:
+        if (gstreamerEngine->isPlaying()) {
+            onPause();
+        } else {
+            onPlay();
+        }
+        break;
+    case Qt::Key_R:
+        if (gstreamerEngine->isRecording()) {
+            onStopRecording();
+        } else {
+            onStartRecording();
+        }
+        break;
+    case Qt::Key_S:
         onScreenshot();
-    } else if (event->key() == Qt::Key_G) {
+        break;
+    case Qt::Key_G:
         onToggleGrid();
-    } else if (event->key() == Qt::Key_Q) {
+        break;
+    case Qt::Key_Q:
         close();
-    } else {
+        break;
+    default:
         QMainWindow::keyPressEvent(event);
     }
 }
@@ -229,9 +277,34 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 }
 
 void MainWindow::loadSettings() {
-    // Load settings from config manager
+    QSettings settings("HywelStar", "HywelStarVideoPlayer");
+
+    // Window geometry
+    if (settings.contains("geometry")) {
+        restoreGeometry(settings.value("geometry").toByteArray());
+    }
+
+    // Last URI
+    QString lastUri = settings.value("lastUri", "").toString();
+    if (!lastUri.isEmpty()) {
+        quickConnectBar->setUri(lastUri);
+    }
+
+    // Volume
+    int volume = settings.value("volume", 50).toInt();
+    gstreamerEngine->setVolume(volume);
+
+    Logger::instance().debug("MainWindow: Settings loaded");
 }
 
 void MainWindow::saveSettings() {
-    // Save settings to config manager
+    QSettings settings("HywelStar", "HywelStarVideoPlayer");
+
+    // Window geometry
+    settings.setValue("geometry", saveGeometry());
+
+    // Last URI
+    settings.setValue("lastUri", quickConnectBar->getStreamUri());
+
+    Logger::instance().debug("MainWindow: Settings saved");
 }

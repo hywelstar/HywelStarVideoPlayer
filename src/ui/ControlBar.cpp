@@ -171,15 +171,12 @@ void ControlBar::connectSignals() {
     connect(recordButton, &QPushButton::clicked, this, [this]() {
         if (!isRecording) {
             emit recordingRequested();
-            isRecording = true;
-            recordButton->setStyleSheet("background-color: #F44336;");
         } else {
             emit recordingStopRequested();
-            isRecording = false;
-            recordButton->setStyleSheet("");
         }
     });
     connect(screenshotButton, &QPushButton::clicked, this, &ControlBar::screenshotRequested);
+    connect(gridButton, &QPushButton::clicked, this, &ControlBar::gridToggleRequested);
     connect(fullscreenButton, &QPushButton::clicked, this, &ControlBar::fullscreenRequested);
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         if (value == 0) {
@@ -201,9 +198,15 @@ void ControlBar::setRecordingTime(qint64 milliseconds) {
 void ControlBar::setRecordingActive(bool active) {
     isRecording = active;
     if (active) {
+        recordButton->setIcon(QIcon(":/icons/stop"));
         recordButton->setStyleSheet("background-color: #F44336;");
+        recordButton->setToolTip(tr("Stop Recording"));
+        recordingTimeLabel->setVisible(true);
     } else {
+        recordButton->setIcon(QIcon(":/icons/record"));
         recordButton->setStyleSheet("");
+        recordButton->setToolTip(tr("Record"));
+        recordingTimeLabel->setText("00:00");
     }
 }
 
