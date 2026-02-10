@@ -13,19 +13,20 @@ A cross-platform video player based on GStreamer and Qt 6.10, supporting Windows
 
 ### Core Features
 - Real-time video playback and recording
-- Screenshot capture
-- Fullscreen/windowed mode toggle
+- Recording with time display
+- Screenshot capture (PNG format)
+- Fullscreen/windowed mode toggle (keyboard or double-click)
 - Grid overlay for positioning assistance
 - Volume control
-- Connection history
+- Settings persistence (window size, last URI, volume)
 
 ## Platform Support
 
 | Platform | Status | Notes |
 |----------|--------|-------|
 | Windows x64 | Supported | Qt 6.10 + GStreamer 1.22.12 |
-| Android arm64-v8a | Supported | Qt 6.10 for Android |
-| Android x86_64 | Supported | For emulator testing |
+| Android arm64-v8a | Planned | Qt 6.10 for Android |
+| Android x86_64 | Planned | For emulator testing |
 
 ## Build Requirements
 
@@ -89,11 +90,19 @@ cmake --build .
 | Key | Function |
 |-----|----------|
 | F | Toggle fullscreen |
+| ESC | Exit fullscreen |
 | Space | Play/Pause |
 | R | Start/Stop recording |
 | S | Screenshot |
 | G | Show/Hide grid |
+| +/- | Zoom in/out |
 | Q | Quit application |
+
+## Mouse Controls
+
+| Action | Function |
+|--------|----------|
+| Double-click | Toggle fullscreen |
 
 ## Project Structure
 
@@ -115,7 +124,7 @@ HywelStarVideoPlayer/
 │       ├── Logger.h/.cpp           # Logging system
 │       └── StreamParser.h/.cpp     # Stream URI parser
 ├── android/                        # Android configuration
-├── resources/                      # Resource files
+├── resources/                      # Resource files (icons)
 ├── cmake/                          # CMake modules
 ├── CMakeLists.txt
 └── README.md
@@ -127,6 +136,17 @@ HywelStarVideoPlayer/
 - **Video Engine**: GStreamer 1.22.12
 - **Language**: C++17
 - **Build System**: CMake 3.16+
+
+## Changelog
+
+### v1.0.0
+- Initial release
+- RTSP, UDP, TCP, HTTP stream support
+- Video recording (MKV format)
+- Screenshot capture
+- Fullscreen mode with keyboard and mouse support
+- Grid overlay
+- Settings persistence
 
 ## Author
 
