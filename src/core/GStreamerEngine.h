@@ -14,6 +14,8 @@
 #include <QString>
 #include <QWindow>
 #include <QImage>
+#include <QFuture>
+#include <QtConcurrent>
 
 #ifndef ANDROID
 #include <gst/gst.h>
@@ -70,6 +72,8 @@ private:
     static gboolean busCallback(GstBus *bus, GstMessage *msg, gpointer data);
     void handleBusMessage(GstMessage *msg);
     void extractStreamInfo(GstCaps *caps);
+    void doStartRecording(const QString &filepath);
+    void doStopRecording();
 #else
     static int busCallback(void *bus, void *msg, void *data);
     void handleBusMessage(void *msg);
