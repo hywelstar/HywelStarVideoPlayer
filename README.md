@@ -2,16 +2,48 @@
 
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
 
-## Features
+## Development Progress
 
-- Stream playback (RTSP, UDP, HTTP, RTP, TCP MPEG-TS)
-- Local video file playback
-- Video recording to MKV format
-- Screenshot capture (PNG format)
-- Grid overlay for video analysis
-- Fullscreen mode (keyboard or double-click)
-- Volume control
-- Settings persistence
+### Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Windows x64 | ✅ Done | Qt 6.10 + GStreamer 1.22 |
+| Linux x64 | 🔲 Planned | - |
+| macOS | 🔲 Planned | - |
+| Android arm64-v8a | 🚧 In Progress | GStreamer integration pending |
+| Android x86_64 | 🔲 Planned | For emulator |
+
+### Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| RTSP Stream Playback | ✅ Done | H.264/H.265 |
+| UDP Stream Playback | ✅ Done | H.264/H.265 |
+| HTTP/HTTPS Playback | ✅ Done | - |
+| Local File Playback | ✅ Done | MP4, MKV, AVI, etc. |
+| Video Recording | ✅ Done | MKV format |
+| Screenshot | ✅ Done | PNG format |
+| Grid Overlay | ✅ Done | For positioning |
+| Fullscreen Mode | ✅ Done | F key / double-click |
+| Volume Control | ✅ Done | Slider + mute |
+| Settings Persistence | ✅ Done | Window size, URI, volume |
+| Recording Timer | ✅ Done | Real-time display |
+| Menu Bar | ✅ Done | Help > About |
+| Settings Dialog | ✅ Done | Recording/Screenshot paths |
+| About Dialog | ✅ Done | App info |
+| Local Playlist | 🔲 Planned | File/folder selection |
+| Playback Speed Control | 🔲 Planned | 0.5x - 2x |
+| Subtitle Support | 🔲 Planned | SRT, ASS |
+| Audio Track Selection | 🔲 Planned | Multi-track support |
+| Hardware Acceleration | 🚧 Partial | D3D11 on Windows |
+| Multi-language UI | 🔲 Planned | i18n support |
+
+### Known Issues
+
+- [ ] Android GStreamer integration not complete
+- [ ] Linux/macOS builds not tested
+- [ ] Hardware decoding may not work on all GPUs
 
 ## Prerequisites
 
@@ -50,14 +82,20 @@ brew install qt@6 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
 
 ## Build Instructions
 
-### Option 1: Qt Creator (Recommended)
+### Option 1: Build Script (Windows)
+
+```bash
+build_windows.bat
+```
+
+### Option 2: Qt Creator (Recommended)
 
 1. Open Qt Creator
 2. File → Open File or Project → Select `CMakeLists.txt`
 3. Configure the project with your Qt kit
 4. Build → Build Project
 
-### Option 2: Command Line
+### Option 3: Command Line
 
 ```bash
 # Windows (from Developer Command Prompt)
@@ -69,11 +107,17 @@ cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x/gcc_64
 cmake --build build --config Release
 ```
 
+### Android Build
+
+```bash
+build_android.bat arm64-v8a
+```
+
 ### Deployment (Windows)
 
 ```bash
 # Deploy Qt dependencies
-windeployqt --release build/Release/HywelStarVideoPlayer.exe
+windeployqt --release build/windows_x64/Release/HywelStarVideoPlayer.exe
 
 # Copy GStreamer DLLs to the same directory
 # Copy GStreamer plugins to lib/gstreamer-1.0/
@@ -102,6 +146,8 @@ windeployqt --release build/Release/HywelStarVideoPlayer.exe
 ```
 HywelStarPlayer/
 ├── CMakeLists.txt          # Build configuration
+├── build_windows.bat       # Windows build script
+├── build_android.bat       # Android build script
 ├── cmake/
 │   └── find-modules/       # CMake find modules
 ├── src/
@@ -113,7 +159,7 @@ HywelStarPlayer/
 ├── resources/
 │   ├── resources.qrc
 │   └── icons/
-└── android/                # Android build files (planned)
+└── android/                # Android build files
 ```
 
 ## Technology Stack
@@ -122,6 +168,16 @@ HywelStarPlayer/
 - **Video Engine**: GStreamer 1.20+
 - **Language**: C++17
 - **Build System**: CMake 3.16+
+
+## Changelog
+
+### v1.0.0 (In Development)
+- Basic stream playback (RTSP, UDP, HTTP)
+- Video recording and screenshot
+- Fullscreen mode with keyboard/mouse support
+- Grid overlay
+- Settings persistence
+- Simplified UI with combined Play/Pause button
 
 ## License
 
