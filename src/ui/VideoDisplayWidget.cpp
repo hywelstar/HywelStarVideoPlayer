@@ -16,7 +16,7 @@
 VideoDisplayWidget::VideoDisplayWidget(QWidget *parent)
     : QWidget(parent)
 {
-    setStyleSheet("background-color: #0d0d1a;");
+    setStyleSheet("background-color: #000000;");
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
@@ -51,7 +51,7 @@ void VideoDisplayWidget::zoom(int delta) {
 void VideoDisplayWidget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event)
     QPainter painter(this);
-    painter.fillRect(rect(), QColor("#0d0d1a"));
+    painter.fillRect(rect(), QColor("#000000"));
 
     if (gridVisible) {
         drawGrid(painter);
