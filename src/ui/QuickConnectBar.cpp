@@ -11,7 +11,6 @@
 #include <QHBoxLayout>
 #include <QSettings>
 #include <QIcon>
-#include <QFileDialog>
 
 QuickConnectBar::QuickConnectBar(QWidget *parent)
     : QWidget(parent)
@@ -32,29 +31,8 @@ void QuickConnectBar::setupUI() {
 
     // URI input
     uriInput = new QLineEdit();
-    uriInput->setPlaceholderText(tr("Enter stream URL or file path..."));
+    uriInput->setPlaceholderText(tr("Enter stream URL (rtsp://, udp://, http://...) and press Enter"));
     layout->addWidget(uriInput, 1);
-
-    // Play button
-    playButton = new QPushButton();
-    playButton->setIcon(QIcon(":/icons/play"));
-    playButton->setIconSize(QSize(20, 20));
-    playButton->setToolTip(tr("Play (Enter)"));
-    layout->addWidget(playButton);
-
-    // Open file button
-    openFileButton = new QPushButton();
-    openFileButton->setIcon(QIcon(":/icons/upload"));
-    openFileButton->setIconSize(QSize(20, 20));
-    openFileButton->setToolTip(tr("Open File"));
-    layout->addWidget(openFileButton);
-
-    // Open folder button
-    openFolderButton = new QPushButton();
-    openFolderButton->setIcon(QIcon(":/icons/expand"));
-    openFolderButton->setIconSize(QSize(20, 20));
-    openFolderButton->setToolTip(tr("Open Folder"));
-    layout->addWidget(openFolderButton);
 
     // Settings button
     settingsButton = new QPushButton();
@@ -62,13 +40,6 @@ void QuickConnectBar::setupUI() {
     settingsButton->setIconSize(QSize(20, 20));
     settingsButton->setToolTip(tr("Settings"));
     layout->addWidget(settingsButton);
-
-    // About button
-    aboutButton = new QPushButton();
-    aboutButton->setIcon(QIcon(":/icons/app_icon"));
-    aboutButton->setIconSize(QSize(20, 20));
-    aboutButton->setToolTip(tr("About"));
-    layout->addWidget(aboutButton);
 
     // Styles
     titleLabel->setStyleSheet("background-color: #ffffff; color: #000000; font-weight: bold; padding: 4px 10px; border-radius: 4px;");
@@ -86,7 +57,7 @@ void QuickConnectBar::setupUI() {
         }
     )");
 
-    QString buttonStyle = R"(
+    settingsButton->setStyleSheet(R"(
         QPushButton {
             background-color: #ffffff;
             color: #000000;
@@ -102,36 +73,13 @@ void QuickConnectBar::setupUI() {
         QPushButton:pressed {
             background-color: #c0c0c0;
         }
-    )";
-
-    playButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #4CAF50;
-            color: #ffffff;
-            border: none;
-            border-radius: 4px;
-            padding: 8px;
-            min-width: 36px;
-            min-height: 36px;
-        }
-        QPushButton:hover {
-            background-color: #66BB6A;
-        }
-        QPushButton:pressed {
-            background-color: #388E3C;
-        }
     )");
-
-    openFileButton->setStyleSheet(buttonStyle);
-    openFolderButton->setStyleSheet(buttonStyle);
-    settingsButton->setStyleSheet(buttonStyle);
-    aboutButton->setStyleSheet(buttonStyle);
 
     setStyleSheet("QWidget { background-color: #1a1a2e; }");
 }
 
 void QuickConnectBar::connectSignals() {
-    connect(playButton, &QPushButton::clicked, this, [this]() {
+    connect(uriInput, &QLineEdit::returnPressed, this, [this]() {
         QString uri = uriInput->text().trimmed();
         if (!uri.isEmpty()) {
             emit playRequested(uri);
@@ -139,31 +87,7 @@ void QuickConnectBar::connectSignals() {
         }
     });
 
-    connect(uriInput, &QLineEdit::returnPressed, playButton, &QPushButton::click);
-
-    connect(openFileButton, &QPushButton::clicked, this, [this]() {
-        QString filePath = QFileDialog::getOpenFileName(this,
-            tr("Open Video File"),
-            QString(),
-            tr("Video Files (*.mp4 *.mkv *.avi *.mov *.wmv *.flv *.webm *.m4v *.ts *.m2ts);;All Files (*)"));
-        if (!filePath.isEmpty()) {
-            uriInput->setText(filePath);
-            emit openFileRequested(filePath);
-        }
-    });
-
-    connect(openFolderButton, &QPushButton::clicked, this, [this]() {
-        QString folderPath = QFileDialog::getExistingDirectory(this,
-            tr("Open Video Folder"),
-            QString(),
-            QFileDialog::ShowDirsOnly);
-        if (!folderPath.isEmpty()) {
-            emit openFolderRequested(folderPath);
-        }
-    });
-
     connect(settingsButton, &QPushButton::clicked, this, &QuickConnectBar::settingsRequested);
-    connect(aboutButton, &QPushButton::clicked, this, &QuickConnectBar::aboutRequested);
 }
 
 QString QuickConnectBar::getStreamUri() const {

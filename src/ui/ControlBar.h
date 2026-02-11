@@ -15,6 +15,12 @@
 #include <QSlider>
 #include <QLabel>
 
+enum class PlaybackState {
+    Stopped,
+    Playing,
+    Paused
+};
+
 class ControlBar : public QWidget {
     Q_OBJECT
 
@@ -24,11 +30,10 @@ public:
     void setRecordingTime(qint64 milliseconds);
     void setRecordingActive(bool active);
     void setFullscreen(bool fullscreen);
+    void setPlaybackState(PlaybackState state);
 
 signals:
-    void playRequested();
-    void pauseRequested();
-    void stopRequested();
+    void playPauseRequested();
     void recordingRequested();
     void recordingStopRequested();
     void screenshotRequested();
@@ -39,10 +44,9 @@ signals:
 private:
     void setupUI();
     void connectSignals();
+    void updatePlayPauseButton();
 
-    QPushButton *playButton;
-    QPushButton *pauseButton;
-    QPushButton *stopButton;
+    QPushButton *playPauseButton;
     QPushButton *recordButton;
     QPushButton *screenshotButton;
     QPushButton *gridButton;
@@ -52,6 +56,7 @@ private:
     QLabel *volumeLabel;
 
     bool isRecording = false;
+    PlaybackState playbackState = PlaybackState::Stopped;
 };
 
 #endif // CONTROL_BAR_H

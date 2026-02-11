@@ -27,10 +27,7 @@ public:
 
 signals:
     void playRequested(const QString &uri);
-    void openFileRequested(const QString &filePath);
-    void openFolderRequested(const QString &folderPath);
     void settingsRequested();
-    void aboutRequested();
 
 private:
     void setupUI();
@@ -39,11 +36,7 @@ private:
 
     QLabel *titleLabel;
     QLineEdit *uriInput;
-    QPushButton *playButton;
-    QPushButton *openFileButton;
-    QPushButton *openFolderButton;
     QPushButton *settingsButton;
-    QPushButton *aboutButton;
 };
 
 #endif // QUICK_CONNECT_BAR_H

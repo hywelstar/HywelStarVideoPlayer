@@ -9,7 +9,6 @@
 
 #include "ControlBar.h"
 #include <QHBoxLayout>
-#include <QVBoxLayout>
 #include <QStyle>
 #include <QIcon>
 
@@ -64,26 +63,12 @@ void ControlBar::setupUI() {
     layout->setContentsMargins(10, 5, 10, 5);
     layout->setSpacing(8);
 
-    // Play button
-    playButton = new QPushButton();
-    playButton->setIcon(QIcon(":/icons/play"));
-    playButton->setIconSize(QSize(24, 24));
-    playButton->setToolTip(tr("Play"));
-    layout->addWidget(playButton);
-
-    // Pause button
-    pauseButton = new QPushButton();
-    pauseButton->setIcon(QIcon(":/icons/pause"));
-    pauseButton->setIconSize(QSize(24, 24));
-    pauseButton->setToolTip(tr("Pause"));
-    layout->addWidget(pauseButton);
-
-    // Stop button
-    stopButton = new QPushButton();
-    stopButton->setIcon(QIcon(":/icons/stop"));
-    stopButton->setIconSize(QSize(24, 24));
-    stopButton->setToolTip(tr("Stop"));
-    layout->addWidget(stopButton);
+    // Play/Pause button (combined)
+    playPauseButton = new QPushButton();
+    playPauseButton->setIcon(QIcon(":/icons/play"));
+    playPauseButton->setIconSize(QSize(24, 24));
+    playPauseButton->setToolTip(tr("Play/Pause (Space)"));
+    layout->addWidget(playPauseButton);
 
     layout->addSpacing(15);
 
@@ -91,7 +76,7 @@ void ControlBar::setupUI() {
     recordButton = new QPushButton();
     recordButton->setIcon(QIcon(":/icons/record"));
     recordButton->setIconSize(QSize(24, 24));
-    recordButton->setToolTip(tr("Record"));
+    recordButton->setToolTip(tr("Record (R)"));
     layout->addWidget(recordButton);
 
     // Recording time label
@@ -106,21 +91,21 @@ void ControlBar::setupUI() {
     screenshotButton = new QPushButton();
     screenshotButton->setIcon(QIcon(":/icons/screenshot"));
     screenshotButton->setIconSize(QSize(24, 24));
-    screenshotButton->setToolTip(tr("Screenshot"));
+    screenshotButton->setToolTip(tr("Screenshot (S)"));
     layout->addWidget(screenshotButton);
 
     // Grid button
     gridButton = new QPushButton();
     gridButton->setIcon(QIcon(":/icons/grid"));
     gridButton->setIconSize(QSize(24, 24));
-    gridButton->setToolTip(tr("Toggle Grid"));
+    gridButton->setToolTip(tr("Toggle Grid (G)"));
     layout->addWidget(gridButton);
 
     // Fullscreen button
     fullscreenButton = new QPushButton();
     fullscreenButton->setIcon(QIcon(":/icons/fullscreen"));
     fullscreenButton->setIconSize(QSize(24, 24));
-    fullscreenButton->setToolTip(tr("Fullscreen"));
+    fullscreenButton->setToolTip(tr("Fullscreen (F)"));
     layout->addWidget(fullscreenButton);
 
     layout->addStretch();
@@ -165,9 +150,7 @@ void ControlBar::setupUI() {
 }
 
 void ControlBar::connectSignals() {
-    connect(playButton, &QPushButton::clicked, this, &ControlBar::playRequested);
-    connect(pauseButton, &QPushButton::clicked, this, &ControlBar::pauseRequested);
-    connect(stopButton, &QPushButton::clicked, this, &ControlBar::stopRequested);
+    connect(playPauseButton, &QPushButton::clicked, this, &ControlBar::playPauseRequested);
     connect(recordButton, &QPushButton::clicked, this, [this]() {
         if (!isRecording) {
             emit recordingRequested();
@@ -188,6 +171,25 @@ void ControlBar::connectSignals() {
     });
 }
 
+void ControlBar::updatePlayPauseButton() {
+    switch (playbackState) {
+    case PlaybackState::Stopped:
+    case PlaybackState::Paused:
+        playPauseButton->setIcon(QIcon(":/icons/play"));
+        playPauseButton->setToolTip(tr("Play (Space)"));
+        break;
+    case PlaybackState::Playing:
+        playPauseButton->setIcon(QIcon(":/icons/pause"));
+        playPauseButton->setToolTip(tr("Pause (Space)"));
+        break;
+    }
+}
+
+void ControlBar::setPlaybackState(PlaybackState state) {
+    playbackState = state;
+    updatePlayPauseButton();
+}
+
 void ControlBar::setRecordingTime(qint64 milliseconds) {
     int seconds = milliseconds / 1000;
     int minutes = seconds / 60;
@@ -199,13 +201,12 @@ void ControlBar::setRecordingActive(bool active) {
     isRecording = active;
     if (active) {
         recordButton->setIcon(QIcon(":/icons/stop"));
-        recordButton->setStyleSheet("background-color: #F44336;");
-        recordButton->setToolTip(tr("Stop Recording"));
-        recordingTimeLabel->setVisible(true);
+        recordButton->setStyleSheet("QPushButton { background-color: #F44336; } QPushButton:hover { background-color: #E53935; } QPushButton:pressed { background-color: #D32F2F; }");
+        recordButton->setToolTip(tr("Stop Recording (R)"));
     } else {
         recordButton->setIcon(QIcon(":/icons/record"));
-        recordButton->setStyleSheet("");
-        recordButton->setToolTip(tr("Record"));
+        recordButton->setStyleSheet("QPushButton { background-color: #ffffff; } QPushButton:hover { background-color: #e0e0e0; } QPushButton:pressed { background-color: #c0c0c0; }");
+        recordButton->setToolTip(tr("Record (R)"));
         recordingTimeLabel->setText("00:00");
     }
 }
@@ -213,9 +214,9 @@ void ControlBar::setRecordingActive(bool active) {
 void ControlBar::setFullscreen(bool fullscreen) {
     if (fullscreen) {
         fullscreenButton->setIcon(QIcon(":/icons/fullscreen_exit"));
-        fullscreenButton->setToolTip(tr("Exit Fullscreen"));
+        fullscreenButton->setToolTip(tr("Exit Fullscreen (F)"));
     } else {
         fullscreenButton->setIcon(QIcon(":/icons/fullscreen"));
-        fullscreenButton->setToolTip(tr("Fullscreen"));
+        fullscreenButton->setToolTip(tr("Fullscreen (F)"));
     }
 }

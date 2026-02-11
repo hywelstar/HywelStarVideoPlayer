@@ -24,6 +24,9 @@
 #include <QCloseEvent>
 #include <QImage>
 #include <QSettings>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -41,6 +44,7 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowIcon(QIcon(":/icons/app_icon"));
     resize(1280, 720);
 
+    setupMenuBar();
     setupUI();
     connectSignals();
     loadSettings();
@@ -54,6 +58,41 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow() {
     Logger::instance().info("MainWindow: Shutting down...");
     saveSettings();
+}
+
+void MainWindow::setupMenuBar() {
+    QMenuBar *menuBar = new QMenuBar(this);
+    menuBar->setStyleSheet(R"(
+        QMenuBar {
+            background-color: #1a1a2e;
+            color: #ffffff;
+            padding: 2px;
+        }
+        QMenuBar::item {
+            background-color: transparent;
+            padding: 4px 10px;
+        }
+        QMenuBar::item:selected {
+            background-color: #3d3d5c;
+        }
+        QMenu {
+            background-color: #1a1a2e;
+            color: #ffffff;
+            border: 1px solid #3d3d5c;
+        }
+        QMenu::item {
+            padding: 6px 20px;
+        }
+        QMenu::item:selected {
+            background-color: #3d3d5c;
+        }
+    )");
+
+    QMenu *helpMenu = menuBar->addMenu(tr("Help"));
+    QAction *aboutAction = helpMenu->addAction(tr("About"));
+    connect(aboutAction, &QAction::triggered, this, &MainWindow::onShowAbout);
+
+    setMenuBar(menuBar);
 }
 
 void MainWindow::setupUI() {
@@ -84,22 +123,12 @@ void MainWindow::connectSignals() {
     // Quick connect bar signals
     connect(quickConnectBar.get(), &QuickConnectBar::playRequested,
             this, &MainWindow::onPlayUri);
-    connect(quickConnectBar.get(), &QuickConnectBar::openFileRequested,
-            this, &MainWindow::onOpenFile);
-    connect(quickConnectBar.get(), &QuickConnectBar::openFolderRequested,
-            this, &MainWindow::onOpenFolder);
     connect(quickConnectBar.get(), &QuickConnectBar::settingsRequested,
             this, &MainWindow::onShowSettings);
-    connect(quickConnectBar.get(), &QuickConnectBar::aboutRequested,
-            this, &MainWindow::onShowAbout);
 
     // Control bar signals
-    connect(controlBar.get(), &ControlBar::playRequested,
-            this, &MainWindow::onPlay);
-    connect(controlBar.get(), &ControlBar::pauseRequested,
-            this, &MainWindow::onPause);
-    connect(controlBar.get(), &ControlBar::stopRequested,
-            this, &MainWindow::onStop);
+    connect(controlBar.get(), &ControlBar::playPauseRequested,
+            this, &MainWindow::onPlayPause);
     connect(controlBar.get(), &ControlBar::recordingRequested,
             this, &MainWindow::onStartRecording);
     connect(controlBar.get(), &ControlBar::recordingStopRequested,
@@ -131,17 +160,7 @@ void MainWindow::connectSignals() {
 void MainWindow::onPlayUri(const QString &uri) {
     Logger::instance().info(QString("MainWindow: Playing URI: %1").arg(uri));
     gstreamerEngine->play(uri);
-}
-
-void MainWindow::onOpenFile(const QString &filePath) {
-    Logger::instance().info(QString("MainWindow: Opening file: %1").arg(filePath));
-    gstreamerEngine->play(filePath);
-}
-
-void MainWindow::onOpenFolder(const QString &folderPath) {
-    Logger::instance().info(QString("MainWindow: Opening folder: %1").arg(folderPath));
-    // TODO: Implement playlist loading from folder
-    statusBar->updateConnectionStatus(QString("Folder: %1").arg(folderPath));
+    controlBar->setPlaybackState(PlaybackState::Playing);
 }
 
 void MainWindow::onShowSettings() {
@@ -161,19 +180,19 @@ void MainWindow::onShowAbout() {
     dialog.exec();
 }
 
-void MainWindow::onPlay() {
-    Logger::instance().info("MainWindow: Play requested");
-    gstreamerEngine->play("");
-}
-
-void MainWindow::onPause() {
-    Logger::instance().info("MainWindow: Pause requested");
-    gstreamerEngine->pause();
-}
-
-void MainWindow::onStop() {
-    Logger::instance().info("MainWindow: Stop requested");
-    gstreamerEngine->stop();
+void MainWindow::onPlayPause() {
+    if (gstreamerEngine->isPlaying()) {
+        Logger::instance().info("MainWindow: Pause requested");
+        gstreamerEngine->pause();
+        controlBar->setPlaybackState(PlaybackState::Paused);
+    } else {
+        Logger::instance().info("MainWindow: Play requested");
+        QString uri = quickConnectBar->getStreamUri();
+        if (!uri.isEmpty()) {
+            gstreamerEngine->play(uri);
+            controlBar->setPlaybackState(PlaybackState::Playing);
+        }
+    }
 }
 
 void MainWindow::onStartRecording() {
@@ -264,15 +283,19 @@ void MainWindow::onPlayerStateChanged(int state) {
     switch (playerState) {
     case PlayerState::Playing:
         statusBar->updateConnectionStatus("Playing");
+        controlBar->setPlaybackState(PlaybackState::Playing);
         break;
     case PlayerState::Paused:
         statusBar->updateConnectionStatus("Paused");
+        controlBar->setPlaybackState(PlaybackState::Paused);
         break;
     case PlayerState::Stopped:
         statusBar->updateConnectionStatus("Stopped");
+        controlBar->setPlaybackState(PlaybackState::Stopped);
         break;
     case PlayerState::Error:
         statusBar->updateConnectionStatus("Error");
+        controlBar->setPlaybackState(PlaybackState::Stopped);
         break;
     }
 }
@@ -293,11 +316,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
         }
         break;
     case Qt::Key_Space:
-        if (gstreamerEngine->isPlaying()) {
-            onPause();
-        } else {
-            onPlay();
-        }
+        onPlayPause();
         break;
     case Qt::Key_R:
         if (gstreamerEngine->isRecording()) {

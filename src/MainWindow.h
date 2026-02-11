@@ -13,6 +13,8 @@
 #include <QMainWindow>
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QMenuBar>
+#include <QMenu>
 #include <memory>
 
 class VideoDisplayWidget;
@@ -37,15 +39,11 @@ protected:
 private slots:
     // QuickConnectBar slots
     void onPlayUri(const QString &uri);
-    void onOpenFile(const QString &filePath);
-    void onOpenFolder(const QString &folderPath);
     void onShowSettings();
     void onShowAbout();
 
     // ControlBar slots
-    void onPlay();
-    void onPause();
-    void onStop();
+    void onPlayPause();
     void onStartRecording();
     void onStopRecording();
     void onScreenshot();
@@ -63,6 +61,7 @@ private slots:
 
 private:
     void setupUI();
+    void setupMenuBar();
     void connectSignals();
     void loadSettings();
     void saveSettings();
