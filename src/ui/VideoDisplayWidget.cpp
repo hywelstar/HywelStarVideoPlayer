@@ -49,6 +49,7 @@ void VideoDisplayWidget::zoom(int delta) {
 }
 
 void VideoDisplayWidget::paintEvent(QPaintEvent *event) {
+    Q_UNUSED(event)
     QPainter painter(this);
     painter.fillRect(rect(), QColor("#0d0d1a"));
 
@@ -69,6 +70,7 @@ void VideoDisplayWidget::mousePressEvent(QMouseEvent *event) {
 }
 
 void VideoDisplayWidget::mouseMoveEvent(QMouseEvent *event) {
+    Q_UNUSED(event)
     if (isDragging) {
         // Handle panning
     }
@@ -102,11 +104,13 @@ void VideoDisplayWidget::keyPressEvent(QKeyEvent *event) {
 }
 
 void VideoDisplayWidget::enterEvent(QEnterEvent *event) {
+    Q_UNUSED(event)
     showHelpText = true;
     update();
 }
 
 void VideoDisplayWidget::leaveEvent(QEvent *event) {
+    Q_UNUSED(event)
     showHelpText = false;
     update();
 }

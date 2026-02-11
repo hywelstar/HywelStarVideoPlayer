@@ -507,6 +507,7 @@ StreamInfo GStreamerEngine::getStreamInfo() const {
 
 #ifndef ANDROID
 gboolean GStreamerEngine::busCallback(GstBus *bus, GstMessage *msg, gpointer data) {
+    Q_UNUSED(bus)
     GStreamerEngine *engine = static_cast<GStreamerEngine *>(data);
     engine->handleBusMessage(msg);
     return TRUE;
