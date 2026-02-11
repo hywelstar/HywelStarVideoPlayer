@@ -97,6 +97,7 @@ void MainWindow::setupMenuBar() {
 
 void MainWindow::setupUI() {
     QWidget *centralWidget = new QWidget(this);
+    centralWidget->setStyleSheet("background-color: #1a1a2e;");
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);

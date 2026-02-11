@@ -673,33 +673,60 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
     Logger::instance().info("GStreamerEngine: Pipeline created successfully");
 
-    // Get video sink
+    // Get video sink from the video-sink bin
     videoSink = gst_bin_get_by_name(GST_BIN(pipeline), "videosink");
     if (!videoSink) {
-        Logger::instance().error("GStreamerEngine: Failed to get video sink from pipeline");
-        emit errorOccurred("Failed to get video sink");
-        gst_object_unref(pipeline);
-        pipeline = nullptr;
-        return;
-    }
-    Logger::instance().debug("GStreamerEngine: Video sink obtained");
-
-    // Set window handle if available
-    if (windowHandle != 0) {
-        if (GST_IS_VIDEO_OVERLAY(videoSink)) {
-            gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
-            Logger::instance().debug(QString("GStreamerEngine: Window handle set: %1").arg(windowHandle));
-        } else {
-            Logger::instance().warning("GStreamerEngine: Video sink does not support overlay");
+        // Try to get from playbin's video-sink property
+        GstElement *playbin = gst_bin_get_by_name(GST_BIN(pipeline), "playbin");
+        if (playbin) {
+            GstElement *videoSinkBin = nullptr;
+            g_object_get(playbin, "video-sink", &videoSinkBin, nullptr);
+            if (videoSinkBin) {
+                videoSink = gst_bin_get_by_name(GST_BIN(videoSinkBin), "videosink");
+                gst_object_unref(videoSinkBin);
+            }
+            gst_object_unref(playbin);
         }
-    } else {
-        Logger::instance().warning("GStreamerEngine: No window handle available");
     }
 
-    // Get tee element (may not exist in simple pipeline)
+    if (!videoSink) {
+        Logger::instance().warning("GStreamerEngine: Video sink not found (audio-only stream?)");
+        // Don't fail - might be audio-only
+    } else {
+        Logger::instance().debug("GStreamerEngine: Video sink obtained");
+
+        // Set window handle if available
+        if (windowHandle != 0) {
+            if (GST_IS_VIDEO_OVERLAY(videoSink)) {
+                gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
+                Logger::instance().debug(QString("GStreamerEngine: Window handle set: %1").arg(windowHandle));
+            } else {
+                Logger::instance().warning("GStreamerEngine: Video sink does not support overlay");
+            }
+        } else {
+            Logger::instance().warning("GStreamerEngine: No window handle available");
+        }
+    }
+
+    // Get tee element (for recording support)
     tee = gst_bin_get_by_name(GST_BIN(pipeline), "t");
+    if (!tee) {
+        // Try to find tee in video-sink bin
+        GstElement *playbin = gst_bin_get_by_name(GST_BIN(pipeline), "playbin");
+        if (playbin) {
+            GstElement *videoSinkBin = nullptr;
+            g_object_get(playbin, "video-sink", &videoSinkBin, nullptr);
+            if (videoSinkBin) {
+                tee = gst_bin_get_by_name(GST_BIN(videoSinkBin), "t");
+                gst_object_unref(videoSinkBin);
+            }
+            gst_object_unref(playbin);
+        }
+    }
     if (tee) {
         Logger::instance().debug("GStreamerEngine: Tee element found");
+    } else {
+        Logger::instance().warning("GStreamerEngine: Tee element not found (recording may not work)");
     }
 
     // Setup bus
@@ -730,86 +757,23 @@ void GStreamerEngine::cleanupPipeline() {
 
 QString GStreamerEngine::buildPipeline(const QString &uri) {
 #ifndef ANDROID
-    // Build pipeline with tee element for recording support
-    // Pipeline structure:
-    //   source -> decodebin3 -> tee -> queue -> videoconvert -> videosink (display)
-    //                           |
-    //                           +-> queue -> x264enc -> muxer -> filesink (recording, added dynamically)
+    // Use playbin3 for automatic audio/video handling
+    // This supports all formats: video, audio, or both
+    // Video sink: d3d11videosink on Windows for hardware acceleration
+    // Audio sink: wasapi2sink on Windows
     //
-    // Use decodebin3 for better codec support (H.264, H.265, VP8, VP9, AV1, etc.)
-    // Use d3d11videosink on Windows for hardware acceleration
-    QString videoSinkName = "d3d11videosink";
+    // Note: playbin3 doesn't support tee directly, so recording will need
+    // a different approach (e.g., using pad probes or separate pipeline)
 
-    if (uri.startsWith("rtsp://", Qt::CaseInsensitive)) {
-        // RTSP pipeline with decodebin3 for multi-codec support
-        return QString("rtspsrc location=%1 latency=100 protocols=tcp+udp ! "
-                      "decodebin3 name=decoder ! "
-                      "tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(uri, videoSinkName);
-    } else if (uri.startsWith("udp://", Qt::CaseInsensitive)) {
-        // UDP pipeline with decodebin3 - auto detect codec
-        return QString("udpsrc uri=%1 ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(uri, videoSinkName);
-    } else if (uri.startsWith("udp264://", Qt::CaseInsensitive)) {
-        // UDP H.264 specific pipeline
-        QString actualUri = uri;
-        actualUri.replace("udp264://", "udp://");
-        return QString("udpsrc uri=%1 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264\" ! "
-                      "rtph264depay ! h264parse ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(actualUri, videoSinkName);
-    } else if (uri.startsWith("udp265://", Qt::CaseInsensitive)) {
-        // UDP H.265 specific pipeline
-        QString actualUri = uri;
-        actualUri.replace("udp265://", "udp://");
-        return QString("udpsrc uri=%1 caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H265\" ! "
-                      "rtph265depay ! h265parse ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(actualUri, videoSinkName);
-    } else if (uri.startsWith("tcp://", Qt::CaseInsensitive)) {
-        // TCP MPEG-TS pipeline with decodebin3
-        QUrl url(uri);
-        return QString("tcpclientsrc host=%1 port=%2 ! "
-                      "tsdemux ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %3 name=videosink")
-            .arg(url.host())
-            .arg(url.port())
-            .arg(videoSinkName);
-    } else if (uri.startsWith("mpegts://", Qt::CaseInsensitive)) {
-        // UDP MPEG-TS pipeline
-        QString actualUri = uri;
-        actualUri.replace("mpegts://", "udp://");
-        return QString("udpsrc uri=%1 ! "
-                      "tsdemux ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(actualUri, videoSinkName);
-    } else if (uri.startsWith("http://", Qt::CaseInsensitive) || uri.startsWith("https://", Qt::CaseInsensitive)) {
-        // HTTP/HLS pipeline with decodebin3
-        return QString("souphttpsrc location=%1 ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(uri, videoSinkName);
-    } else if (uri.startsWith("file://", Qt::CaseInsensitive) || QFile::exists(uri)) {
-        // Local file pipeline with decodebin3
-        QString filePath = uri.startsWith("file://") ? uri.mid(7) : uri;
-        return QString("filesrc location=\"%1\" ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(filePath, videoSinkName);
-    } else {
-        // Default: assume RTSP with decodebin3
-        return QString("rtspsrc location=%1 latency=100 ! "
-                      "decodebin3 ! tee name=t ! "
-                      "queue name=displayqueue ! videoconvert ! %2 name=videosink")
-            .arg(uri, videoSinkName);
-    }
+    QString videoSinkName = "d3d11videosink";
+    QString audioSinkName = "wasapi2sink";
+
+    // For now, use a simpler playbin3 approach that handles both audio and video
+    // The tee element is created as a placeholder for future recording support
+    return QString("playbin3 uri=\"%1\" name=playbin "
+                  "video-sink=\"videoconvert ! tee name=t ! queue name=displayqueue ! %2 name=videosink\" "
+                  "audio-sink=\"audioconvert ! audioresample ! %3 name=audiosink\"")
+        .arg(uri, videoSinkName, audioSinkName);
 #else
     (void)uri;
     return "";
