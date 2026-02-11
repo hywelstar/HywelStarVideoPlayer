@@ -13,7 +13,6 @@
 #include <QWidget>
 #include <QLineEdit>
 #include <QPushButton>
-#include <QComboBox>
 #include <QLabel>
 
 class QuickConnectBar : public QWidget {
@@ -27,9 +26,11 @@ public:
     void setUri(const QString &uri);
 
 signals:
-    void connectRequested(const QString &uri);
-    void disconnectRequested();
+    void playRequested(const QString &uri);
+    void openFileRequested(const QString &filePath);
+    void openFolderRequested(const QString &folderPath);
     void settingsRequested();
+    void aboutRequested();
 
 private:
     void setupUI();
@@ -38,11 +39,11 @@ private:
 
     QLabel *titleLabel;
     QLineEdit *uriInput;
-    QPushButton *connectButton;
-    QPushButton *disconnectButton;
+    QPushButton *playButton;
+    QPushButton *openFileButton;
+    QPushButton *openFolderButton;
     QPushButton *settingsButton;
-
-    bool isConnected = false;
+    QPushButton *aboutButton;
 };
 
 #endif // QUICK_CONNECT_BAR_H

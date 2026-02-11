@@ -12,6 +12,8 @@
 #include "ui/ControlBar.h"
 #include "ui/StatusBar.h"
 #include "ui/QuickConnectBar.h"
+#include "ui/SettingsDialog.h"
+#include "ui/AboutDialog.h"
 #include "core/GStreamerEngine.h"
 #include "core/RecordingManager.h"
 #include "core/ConfigManager.h"
@@ -35,8 +37,8 @@ MainWindow::MainWindow(QWidget *parent)
     , recordingTimer(new QTimer(this))
 {
     Logger::instance().info("MainWindow: Initializing main window...");
-    setWindowTitle("Hywel Star Video Player");
-    setWindowIcon(QIcon(":/icons/app.png"));
+    setWindowTitle("HywelStar Video Player");
+    setWindowIcon(QIcon(":/icons/app_icon"));
     resize(1280, 720);
 
     setupUI();
@@ -80,10 +82,16 @@ void MainWindow::setupUI() {
 
 void MainWindow::connectSignals() {
     // Quick connect bar signals
-    connect(quickConnectBar.get(), &QuickConnectBar::connectRequested,
-            this, &MainWindow::onConnect);
-    connect(quickConnectBar.get(), &QuickConnectBar::disconnectRequested,
-            this, &MainWindow::onDisconnect);
+    connect(quickConnectBar.get(), &QuickConnectBar::playRequested,
+            this, &MainWindow::onPlayUri);
+    connect(quickConnectBar.get(), &QuickConnectBar::openFileRequested,
+            this, &MainWindow::onOpenFile);
+    connect(quickConnectBar.get(), &QuickConnectBar::openFolderRequested,
+            this, &MainWindow::onOpenFolder);
+    connect(quickConnectBar.get(), &QuickConnectBar::settingsRequested,
+            this, &MainWindow::onShowSettings);
+    connect(quickConnectBar.get(), &QuickConnectBar::aboutRequested,
+            this, &MainWindow::onShowAbout);
 
     // Control bar signals
     connect(controlBar.get(), &ControlBar::playRequested,
@@ -120,14 +128,37 @@ void MainWindow::connectSignals() {
             this, &MainWindow::onErrorOccurred);
 }
 
-void MainWindow::onConnect(const QString &uri) {
-    Logger::instance().info(QString("MainWindow: Connecting to: %1").arg(uri));
+void MainWindow::onPlayUri(const QString &uri) {
+    Logger::instance().info(QString("MainWindow: Playing URI: %1").arg(uri));
     gstreamerEngine->play(uri);
 }
 
-void MainWindow::onDisconnect() {
-    Logger::instance().info("MainWindow: Disconnecting...");
-    gstreamerEngine->stop();
+void MainWindow::onOpenFile(const QString &filePath) {
+    Logger::instance().info(QString("MainWindow: Opening file: %1").arg(filePath));
+    gstreamerEngine->play(filePath);
+}
+
+void MainWindow::onOpenFolder(const QString &folderPath) {
+    Logger::instance().info(QString("MainWindow: Opening folder: %1").arg(folderPath));
+    // TODO: Implement playlist loading from folder
+    statusBar->updateConnectionStatus(QString("Folder: %1").arg(folderPath));
+}
+
+void MainWindow::onShowSettings() {
+    SettingsDialog dialog(this);
+    dialog.setRecordingPath(recordingManager->getRecordingPath());
+    dialog.setScreenshotPath(recordingManager->getScreenshotPath());
+
+    if (dialog.exec() == QDialog::Accepted) {
+        recordingManager->setRecordingPath(dialog.getRecordingPath());
+        recordingManager->setScreenshotPath(dialog.getScreenshotPath());
+        Logger::instance().info("MainWindow: Settings updated");
+    }
+}
+
+void MainWindow::onShowAbout() {
+    AboutDialog dialog(this);
+    dialog.exec();
 }
 
 void MainWindow::onPlay() {
@@ -313,6 +344,16 @@ void MainWindow::loadSettings() {
     int volume = settings.value("volume", 50).toInt();
     gstreamerEngine->setVolume(volume);
 
+    // Recording paths
+    QString recordingPath = settings.value("recordingPath", "").toString();
+    if (!recordingPath.isEmpty()) {
+        recordingManager->setRecordingPath(recordingPath);
+    }
+    QString screenshotPath = settings.value("screenshotPath", "").toString();
+    if (!screenshotPath.isEmpty()) {
+        recordingManager->setScreenshotPath(screenshotPath);
+    }
+
     Logger::instance().debug("MainWindow: Settings loaded");
 }
 
@@ -324,6 +365,10 @@ void MainWindow::saveSettings() {
 
     // Last URI
     settings.setValue("lastUri", quickConnectBar->getStreamUri());
+
+    // Recording paths
+    settings.setValue("recordingPath", recordingManager->getRecordingPath());
+    settings.setValue("screenshotPath", recordingManager->getScreenshotPath());
 
     Logger::instance().debug("MainWindow: Settings saved");
 }

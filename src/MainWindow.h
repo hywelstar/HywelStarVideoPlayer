@@ -35,8 +35,14 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 private slots:
-    void onConnect(const QString &uri);
-    void onDisconnect();
+    // QuickConnectBar slots
+    void onPlayUri(const QString &uri);
+    void onOpenFile(const QString &filePath);
+    void onOpenFolder(const QString &folderPath);
+    void onShowSettings();
+    void onShowAbout();
+
+    // ControlBar slots
     void onPlay();
     void onPause();
     void onStop();
@@ -46,9 +52,13 @@ private slots:
     void onToggleFullScreen();
     void onToggleGrid();
     void onVolumeChanged(int volume);
+
+    // Engine slots
     void onStreamInfoChanged(int width, int height, int fps, int bitrate);
     void onPlayerStateChanged(int state);
     void onErrorOccurred(const QString &error);
+
+    // Timer slots
     void updateRecordingTime();
 
 private:
