@@ -1,8 +1,20 @@
 # ============================================================================
 # HywelStar Video Player - CMake Build Configuration
-# Author: hywelstar
-# Email: hywelstar@126.com
-# License: MIT
+# ============================================================================
+#
+# Prerequisites:
+#   - Qt 6.6+ (https://www.qt.io/download)
+#   - GStreamer 1.20+ (https://gstreamer.freedesktop.org/download/)
+#
+# Build Instructions:
+#   Option 1: Use Qt Creator (Recommended)
+#     - Open CMakeLists.txt in Qt Creator
+#     - Configure and build
+#
+#   Option 2: Command Line
+#     cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x/msvc2022_64
+#     cmake --build build --config Release
+#
 # ============================================================================
 
 cmake_minimum_required(VERSION 3.16)
@@ -13,6 +25,7 @@ cmake_minimum_required(VERSION 3.16)
 project(HywelStarVideoPlayer
     VERSION 1.0.0
     DESCRIPTION "GStreamer-based Video Player"
+    HOMEPAGE_URL "https://github.com/hywelstar/HywelStarVideoPlayer"
     LANGUAGES CXX
 )
 
@@ -34,108 +47,50 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Set default build type
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type (Debug or Release)" FORCE)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Build type" FORCE)
 endif()
 
+message(STATUS "")
+message(STATUS "=== HywelStar Video Player Configuration ===")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 
-# Android specific settings
-if(ANDROID)
-    message(STATUS "Android ABI: ${ANDROID_ABI}")
-    message(STATUS "Android Platform: ${ANDROID_PLATFORM}")
-    set(CMAKE_ANDROID_API_MIN 21)
-    set(CMAKE_ANDROID_STL_TYPE c++_shared)
-
-    # Qt for Android package source directory
-    set(QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
-    message(STATUS "Qt Android package source: ${QT_ANDROID_PACKAGE_SOURCE_DIR}")
-
-    # Set Android SDK path for Qt CMake macros
-    set(ANDROID_SDK_ROOT "D:/Software/android_sdk" CACHE PATH "Android SDK root")
-    set(QT_ANDROID_SDK_ROOT "${ANDROID_SDK_ROOT}")
-endif()
-
 # ============================================================================
-# CPM (CMake Package Manager) Configuration
+# Output Directories (Qt Creator style)
 # ============================================================================
-include(CPM)
-if(NOT CPM_SOURCE_CACHE)
-    set(CPM_SOURCE_CACHE "${CMAKE_BINARY_DIR}/cpm_modules")
-endif()
-
-message(STATUS "CPM cache directory: ${CPM_SOURCE_CACHE}")
-
-# ============================================================================
-# Output Directories
-# ============================================================================
-if(ANDROID)
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-else()
-    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/bin")
-endif()
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 
 # ============================================================================
 # Qt6 Configuration
 # ============================================================================
-# For Android, explicitly set Qt6_DIR and related paths
-if(ANDROID)
-    # Determine Qt path based on ABI
-    if(ANDROID_ABI STREQUAL "arm64-v8a")
-        set(QT_ANDROID_PATH "F:/QT/6.10.0/android_arm64_v8a")
-    elseif(ANDROID_ABI STREQUAL "x86_64")
-        set(QT_ANDROID_PATH "F:/QT/6.10.0/android_x86_64")
-    elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
-        set(QT_ANDROID_PATH "F:/QT/6.10.0/android_armv7")
-    elseif(ANDROID_ABI STREQUAL "x86")
-        set(QT_ANDROID_PATH "F:/QT/6.10.0/android_x86")
-    else()
-        set(QT_ANDROID_PATH "F:/QT/6.10.0/android_arm64_v8a")
-    endif()
-
-    set(Qt6_DIR "${QT_ANDROID_PATH}/lib/cmake/Qt6" CACHE PATH "Qt6 CMake config directory")
-    set(Qt6Core_DIR "${QT_ANDROID_PATH}/lib/cmake/Qt6Core" CACHE PATH "Qt6Core CMake config directory")
-    set(Qt6Gui_DIR "${QT_ANDROID_PATH}/lib/cmake/Qt6Gui" CACHE PATH "Qt6Gui CMake config directory")
-    set(Qt6Widgets_DIR "${QT_ANDROID_PATH}/lib/cmake/Qt6Widgets" CACHE PATH "Qt6Widgets CMake config directory")
-    message(STATUS "Android Qt6_DIR: ${Qt6_DIR}")
-
-    # Qt for Android specific settings
-    set(QT_ANDROID_ABIS "${ANDROID_ABI}")
-    set(QT_ANDROID_MIN_SDK_VERSION 30)
-    set(QT_ANDROID_TARGET_SDK_VERSION 35)
-    set(QT_ANDROID_COMPILE_SDK_VERSION 35)
-endif()
-
-find_package(Qt6 COMPONENTS
+find_package(Qt6 6.6 REQUIRED COMPONENTS
     Core
     Gui
     Widgets
-    REQUIRED
 )
 
-message(STATUS "Qt6 found: ${Qt6_DIR}")
+if(NOT Qt6_FOUND)
+    message(FATAL_ERROR
+        "Qt6 6.6+ not found.\n"
+        "Set CMAKE_PREFIX_PATH to your Qt installation, e.g.:\n"
+        "  cmake -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64 ..\n"
+        "Or use qt-cmake which sets this automatically."
+    )
+endif()
+
+message(STATUS "Qt6 Version: ${Qt6_VERSION}")
+message(STATUS "Qt6 Path: ${Qt6_DIR}")
 
 # ============================================================================
 # GStreamer Configuration
 # ============================================================================
-# For Android, GStreamer support is optional or requires special handling
-if(NOT ANDROID)
-    find_package(GStreamer 1.22.12 REQUIRED)
-    message(STATUS "GStreamer found")
-    message(STATUS "  Include dirs: ${GStreamer_INCLUDE_DIRS}")
-    message(STATUS "  Libraries: ${GStreamer_LIBRARIES}")
-else()
-    message(STATUS "Android platform: GStreamer support to be added")
-    # TODO: Add GStreamer Android support
-    set(GStreamer_INCLUDE_DIRS "")
-    set(GStreamer_LIBRARIES "")
-    set(GStreamer_LIBRARY_DIRS "")
-endif()
+find_package(GStreamer 1.20 REQUIRED)
+
+message(STATUS "GStreamer Version: ${GStreamer_VERSION}")
+message(STATUS "GStreamer Path: ${GStreamer_ROOT_DIR}")
 
 # ============================================================================
 # Source Files
@@ -171,9 +126,6 @@ set(HEADERS
     src/utils/StreamParser.h
 )
 
-# ============================================================================
-# Resources
-# ============================================================================
 set(RESOURCES
     resources/resources.qrc
 )
@@ -181,20 +133,13 @@ set(RESOURCES
 # ============================================================================
 # Create Executable
 # ============================================================================
-if(ANDROID)
-    qt_add_executable(${PROJECT_NAME}
-        MANUAL_FINALIZATION
-        ${SOURCES}
-        ${HEADERS}
-        ${RESOURCES}
-    )
-else()
-    add_executable(${PROJECT_NAME}
-        ${SOURCES}
-        ${HEADERS}
-        ${RESOURCES}
-    )
-endif()
+qt_add_executable(${PROJECT_NAME}
+    WIN32
+    MACOSX_BUNDLE
+    ${SOURCES}
+    ${HEADERS}
+    ${RESOURCES}
+)
 
 # ============================================================================
 # Include Directories
@@ -216,22 +161,15 @@ target_link_libraries(${PROJECT_NAME}
         ${GStreamer_LIBRARIES}
 )
 
-# Android specific libraries
-if(ANDROID)
-    target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-            android
-            log
-    )
-endif()
-
 # ============================================================================
 # Link Directories
 # ============================================================================
-target_link_directories(${PROJECT_NAME}
-    PRIVATE
-        ${GStreamer_LIBRARY_DIRS}
-)
+if(GStreamer_LIBRARY_DIRS)
+    target_link_directories(${PROJECT_NAME}
+        PRIVATE
+            ${GStreamer_LIBRARY_DIRS}
+    )
+endif()
 
 # ============================================================================
 # Compiler Flags
@@ -245,32 +183,16 @@ endif()
 # ============================================================================
 # Installation
 # ============================================================================
-if(ANDROID)
-    install(TARGETS ${PROJECT_NAME}
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin
-    )
-else()
-    install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION bin
-    )
-endif()
+install(TARGETS ${PROJECT_NAME}
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
 # ============================================================================
-# Finalize Android Executable
-# ============================================================================
-if(ANDROID)
-    qt_finalize_executable(${PROJECT_NAME})
-endif()
-
-# ============================================================================
-# Summary
+# Build Summary
 # ============================================================================
 message(STATUS "")
-message(STATUS "=== ${PROJECT_NAME} Build Configuration ===")
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "=== Build Summary ===")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
-message(STATUS "Qt6 Version: ${Qt6_VERSION}")
-message(STATUS "GStreamer Version: 1.22.12")
 message(STATUS "Output directory: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 message(STATUS "")

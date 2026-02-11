@@ -1,113 +1,133 @@
-# Build directories
-build/
-build_*/
+# ==============================================================================
+# HywelStar Video Player - Git Ignore Patterns
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# IDEs & Editors
+# ------------------------------------------------------------------------------
+.idea/
+.qtcreator/
+.vs/
+.vscode/
+.settings/
+
+# Editor temp/backup files
+*.swp
+*.swo
+*~
+*.autosave
+tags
+
+# ------------------------------------------------------------------------------
+# Build System & CMake
+# ------------------------------------------------------------------------------
+build*/
 cmake-build-*/
 out/
-
-# CMake generated files
-CMakeCache.txt
 CMakeFiles/
+CMakeCache.txt
+CMakeLists.txt.user*
+CMakeUserPresets.json
+compile_commands.json
 cmake_install.cmake
 Makefile
-*.cmake
-!cmake/*.cmake
+*.ninja
+.ninja_log
+build.ninja
 
-# Visual Studio
-.vs/
-*.vcxproj
-*.vcxproj.filters
-*.vcxproj.user
-*.sln
-*.suo
-*.user
-*.userosscache
-*.sln.docstates
-x64/
-x86/
-Debug/
-Release/
-*.pdb
-*.ilk
-*.obj
-*.lib
-*.exp
-
-# Qt Creator
-*.pro.user
-*.pro.user.*
-*.qbs.user
-*.qbs.user.*
-*.moc
+# ------------------------------------------------------------------------------
+# Qt Generated Files
+# ------------------------------------------------------------------------------
+*_qmlcache.qrc
+qrc_*.cpp
 moc_*.cpp
 moc_*.h
-qrc_*.cpp
 ui_*.h
-*.autosave
+*.moc
+*.prl
+*.qm
 
-# Compiled files
+# ------------------------------------------------------------------------------
+# Compiled Objects & Binaries
+# ------------------------------------------------------------------------------
+*.o
+*.obj
 *.exe
 *.dll
 *.so
+*.so.*
 *.dylib
 *.a
-*.o
+*.lib
+*.pdb
+*.ilk
+*.exp
+*.idb
+
+# Build output directories
+Debug/
+Release/
+x64/
+x86/
+
+# Packaging & distribution
+*.dmg
+*.deb
+*.rpm
+*.AppImage
 *.apk
 *.aab
 
-# Android build
+# ------------------------------------------------------------------------------
+# Platform-Specific
+# ------------------------------------------------------------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows - Visual Studio
+*.vcproj
+*.vcxproj*
+*.sln
+*.suo
+*.ncb
+*.sdf
+*.ipch
+*.opensdf
+
+# ------------------------------------------------------------------------------
+# Android Build
+# ------------------------------------------------------------------------------
+android/build/
+android/.gradle/
 .gradle/
 local.properties
 *.keystore
 !debug.keystore
-android/build/
-android/.gradle/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.project
-.cproject
-.settings/
-
-# Logs
+# ------------------------------------------------------------------------------
+# Runtime & Logs
+# ------------------------------------------------------------------------------
 *.log
-app.log
-
-# GStreamer plugins (deployed)
-lib/gstreamer-1.0/
-
-# Qt deployment
-plugins/
-translations/
-*.qm
-
-# OS generated
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Temporary files
 *.tmp
 *.temp
 *.bak
 *.orig
 
-# User-specific files
-*.user.props
-*.user.targets
+# ------------------------------------------------------------------------------
+# Deployment (generated at runtime)
+# ------------------------------------------------------------------------------
+lib/gstreamer-1.0/
+plugins/
+translations/
 
-# Package directories
-node_modules/
-packages/
-
-# Test output
-test-results/
-coverage/
+# ------------------------------------------------------------------------------
+# OS Generated
+# ------------------------------------------------------------------------------
+Thumbs.db
+desktop.ini
+ehthumbs.db
+.Spotlight-V100
+.Trashes

@@ -1,102 +1,95 @@
 # HywelStar Video Player
 
-A cross-platform video player based on GStreamer and Qt 6.10, supporting Windows and Android platforms.
+A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
 
 ## Features
 
-### Supported Stream Formats
-- RTSP (H.264/H.265)
-- UDP H.264/H.265
-- TCP MPEG-TS
-- HTTP/HTTPS streaming
-- Local video files
-
-### Core Features
-- Real-time video playback and recording
-- Recording with time display
+- Stream playback (RTSP, UDP, HTTP, RTP, TCP MPEG-TS)
+- Local video file playback
+- Video recording to MKV format
 - Screenshot capture (PNG format)
-- Fullscreen/windowed mode toggle (keyboard or double-click)
-- Grid overlay for positioning assistance
+- Grid overlay for video analysis
+- Fullscreen mode (keyboard or double-click)
 - Volume control
-- Settings persistence (window size, last URI, volume)
+- Settings persistence
 
-## Platform Support
-
-| Platform | Status | Notes |
-|----------|--------|-------|
-| Windows x64 | Supported | Qt 6.10 + GStreamer 1.22.12 |
-| Android arm64-v8a | Planned | Qt 6.10 for Android |
-| Android x86_64 | Planned | For emulator testing |
-
-## Build Requirements
-
-### Common Requirements
-- CMake 3.16+
-- Qt 6.10.0
-- C++17 compiler
+## Prerequisites
 
 ### Windows
-- Visual Studio 2022
-- GStreamer 1.22.12 (MSVC 64-bit)
 
-### Android
-- Android NDK 27+
-- Android SDK
+1. **Qt 6.6+**
+   - Download from [Qt Online Installer](https://www.qt.io/download-qt-installer)
+   - Install MSVC 2022 64-bit kit
+
+2. **GStreamer 1.20+**
+   - Download from [GStreamer Downloads](https://gstreamer.freedesktop.org/download/)
+   - Install both **Runtime** and **Development** packages (MSVC 64-bit)
+   - The installer will set environment variables automatically
+
+3. **Visual Studio 2022** (or Build Tools)
+   - Required for MSVC compiler
+
+### Linux (Ubuntu/Debian)
+
+```bash
+# Qt 6
+sudo apt install qt6-base-dev qt6-tools-dev cmake
+
+# GStreamer
+sudo apt install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev \
+    gstreamer1.0-plugins-ugly gstreamer1.0-libav
+```
+
+### macOS
+
+```bash
+# Using Homebrew
+brew install qt@6 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
+```
 
 ## Build Instructions
 
-### Windows Build
+### Option 1: Qt Creator (Recommended)
+
+1. Open Qt Creator
+2. File → Open File or Project → Select `CMakeLists.txt`
+3. Configure the project with your Qt kit
+4. Build → Build Project
+
+### Option 2: Command Line
 
 ```bash
-# Configure
-cd build/windows_x64
-cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH="F:/QT/6.10.0/msvc2022_64" ../..
+# Windows (from Developer Command Prompt)
+cmake -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64
+cmake --build build --config Release
 
-# Build
-cmake --build . --config Release
+# Linux/macOS
+cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x/gcc_64
+cmake --build build --config Release
+```
 
+### Deployment (Windows)
+
+```bash
 # Deploy Qt dependencies
-windeployqt --release Release/bin/HywelStarVideoPlayer.exe
+windeployqt --release build/Release/HywelStarVideoPlayer.exe
 
-# Copy GStreamer DLLs to Release/bin/
-# Copy GStreamer plugins to Release/bin/lib/gstreamer-1.0/
-```
-
-Or use the build script:
-```bash
-build_windows.bat
-```
-
-### Android Build
-
-```bash
-# Using build script
-build_android.bat arm64-v8a
-
-# Or manual configuration
-cd build/android_arm64_v8a
-cmake -G Ninja \
-    -DCMAKE_TOOLCHAIN_FILE=%ANDROID_NDK_ROOT%/build/cmake/android.toolchain.cmake \
-    -DANDROID_ABI=arm64-v8a \
-    -DANDROID_PLATFORM=android-30 \
-    -DCMAKE_PREFIX_PATH="F:/QT/6.10.0/android_arm64_v8a" \
-    ../..
-
-cmake --build .
+# Copy GStreamer DLLs to the same directory
+# Copy GStreamer plugins to lib/gstreamer-1.0/
 ```
 
 ## Keyboard Shortcuts
 
-| Key | Function |
-|-----|----------|
-| F | Toggle fullscreen |
-| ESC | Exit fullscreen |
+| Key | Action |
+|-----|--------|
 | Space | Play/Pause |
-| R | Start/Stop recording |
+| R | Start/Stop Recording |
 | S | Screenshot |
-| G | Show/Hide grid |
-| +/- | Zoom in/out |
-| Q | Quit application |
+| G | Toggle Grid |
+| F | Toggle Fullscreen |
+| Esc | Exit Fullscreen |
+| Q | Quit |
 
 ## Mouse Controls
 
@@ -107,52 +100,33 @@ cmake --build .
 ## Project Structure
 
 ```
-HywelStarVideoPlayer/
+HywelStarPlayer/
+├── CMakeLists.txt          # Build configuration
+├── cmake/
+│   └── find-modules/       # CMake find modules
 ├── src/
-│   ├── main.cpp                    # Application entry point
-│   ├── MainWindow.h/.cpp           # Main window
-│   ├── core/
-│   │   ├── GStreamerEngine.h/.cpp  # GStreamer engine
-│   │   ├── RecordingManager.h/.cpp # Recording management
-│   │   └── ConfigManager.h/.cpp    # Configuration management
-│   ├── ui/
-│   │   ├── VideoDisplayWidget.h/.cpp  # Video display
-│   │   ├── ControlBar.h/.cpp          # Control bar
-│   │   ├── StatusBar.h/.cpp           # Status bar
-│   │   └── QuickConnectBar.h/.cpp     # Quick connect bar
-│   └── utils/
-│       ├── Logger.h/.cpp           # Logging system
-│       └── StreamParser.h/.cpp     # Stream URI parser
-├── android/                        # Android configuration
-├── resources/                      # Resource files (icons)
-├── cmake/                          # CMake modules
-├── CMakeLists.txt
-└── README.md
+│   ├── main.cpp
+│   ├── MainWindow.cpp/h
+│   ├── core/               # GStreamer engine, recording
+│   ├── ui/                 # UI components
+│   └── utils/              # Logger, stream parser
+├── resources/
+│   ├── resources.qrc
+│   └── icons/
+└── android/                # Android build files (planned)
 ```
 
 ## Technology Stack
 
-- **UI Framework**: Qt 6.10
-- **Video Engine**: GStreamer 1.22.12
+- **UI Framework**: Qt 6.6+
+- **Video Engine**: GStreamer 1.20+
 - **Language**: C++17
 - **Build System**: CMake 3.16+
-
-## Changelog
-
-### v1.0.0
-- Initial release
-- RTSP, UDP, TCP, HTTP stream support
-- Video recording (MKV format)
-- Screenshot capture
-- Fullscreen mode with keyboard and mouse support
-- Grid overlay
-- Settings persistence
-
-## Author
-
-- **Author**: hywelstar
-- **Email**: hywelstar@126.com
 
 ## License
 
 MIT License
+
+## Author
+
+hywelstar (hywelstar@126.com)
