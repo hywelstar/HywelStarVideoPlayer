@@ -64,8 +64,8 @@ void MainWindow::setupMenuBar() {
     QMenuBar *menuBar = new QMenuBar(this);
     menuBar->setStyleSheet(R"(
         QMenuBar {
-            background-color: #1a1a2e;
-            color: #ffffff;
+            background-color: #ffffff;
+            color: #3d3d5c;
             padding: 2px;
         }
         QMenuBar::item {
@@ -73,18 +73,18 @@ void MainWindow::setupMenuBar() {
             padding: 4px 10px;
         }
         QMenuBar::item:selected {
-            background-color: #3d3d5c;
+            background-color: #e0e0e0;
         }
         QMenu {
-            background-color: #1a1a2e;
-            color: #ffffff;
+            background-color: #ffffff;
+            color: #3d3d5c;
             border: 1px solid #3d3d5c;
         }
         QMenu::item {
             padding: 6px 20px;
         }
         QMenu::item:selected {
-            background-color: #3d3d5c;
+            background-color: #e0e0e0;
         }
     )");
 

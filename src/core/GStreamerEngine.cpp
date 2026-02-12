@@ -250,13 +250,13 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
 
     g_object_set(G_OBJECT(fileSink), "location", filepath.toStdString().c_str(), nullptr);
 
-    // Add all elements to pipeline
-    gst_bin_add_many(GST_BIN(pipeline), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+    // Add all elements to videoSinkBin (where tee lives)
+    gst_bin_add_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
 
     // Link recording branch: queue -> videoconvert -> encoder -> muxer -> filesink
     if (!gst_element_link_many(recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr)) {
         Logger::instance().error("GStreamerEngine: Failed to link recording elements");
-        gst_bin_remove_many(GST_BIN(pipeline), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -271,7 +271,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     GstPad *teeSrcPad = gst_element_request_pad_simple(tee, "src_%u");
     if (!teeSrcPad) {
         Logger::instance().error("GStreamerEngine: Failed to get tee src pad");
-        gst_bin_remove_many(GST_BIN(pipeline), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -287,7 +287,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         Logger::instance().error("GStreamerEngine: Failed to get queue sink pad");
         gst_element_release_request_pad(tee, teeSrcPad);
         gst_object_unref(teeSrcPad);
-        gst_bin_remove_many(GST_BIN(pipeline), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -309,7 +309,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         gst_element_release_request_pad(tee, teeSrcPad);
         gst_object_unref(teeSrcPad);
         recordingTeePad = nullptr;
-        gst_bin_remove_many(GST_BIN(pipeline), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -377,36 +377,36 @@ void GStreamerEngine::doStopRecording() {
     g_usleep(200000); // 200ms
 
     // Get all recording elements by name and remove them
-    GstElement *recQueue = gst_bin_get_by_name(GST_BIN(pipeline), "recordingqueue");
-    GstElement *recVideoConvert = gst_bin_get_by_name(GST_BIN(pipeline), "recvideoconvert");
-    GstElement *recEncoder = gst_bin_get_by_name(GST_BIN(pipeline), "encoder");
-    GstElement *recMuxer = gst_bin_get_by_name(GST_BIN(pipeline), "muxer");
-    GstElement *recFileSink = gst_bin_get_by_name(GST_BIN(pipeline), "filesink");
+    GstElement *recQueue = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recordingqueue");
+    GstElement *recVideoConvert = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recvideoconvert");
+    GstElement *recEncoder = gst_bin_get_by_name(GST_BIN(videoSinkBin), "encoder");
+    GstElement *recMuxer = gst_bin_get_by_name(GST_BIN(videoSinkBin), "muxer");
+    GstElement *recFileSink = gst_bin_get_by_name(GST_BIN(videoSinkBin), "filesink");
 
-    // Set to NULL state and remove from pipeline
+    // Set to NULL state and remove from videoSinkBin
     if (recQueue) {
         gst_element_set_state(recQueue, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(pipeline), recQueue);
+        gst_bin_remove(GST_BIN(videoSinkBin), recQueue);
         gst_object_unref(recQueue);
     }
     if (recVideoConvert) {
         gst_element_set_state(recVideoConvert, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(pipeline), recVideoConvert);
+        gst_bin_remove(GST_BIN(videoSinkBin), recVideoConvert);
         gst_object_unref(recVideoConvert);
     }
     if (recEncoder) {
         gst_element_set_state(recEncoder, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(pipeline), recEncoder);
+        gst_bin_remove(GST_BIN(videoSinkBin), recEncoder);
         gst_object_unref(recEncoder);
     }
     if (recMuxer) {
         gst_element_set_state(recMuxer, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(pipeline), recMuxer);
+        gst_bin_remove(GST_BIN(videoSinkBin), recMuxer);
         gst_object_unref(recMuxer);
     }
     if (recFileSink) {
         gst_element_set_state(recFileSink, GST_STATE_NULL);
-        gst_bin_remove(GST_BIN(pipeline), recFileSink);
+        gst_bin_remove(GST_BIN(videoSinkBin), recFileSink);
         gst_object_unref(recFileSink);
     }
 
@@ -475,13 +475,13 @@ QImage GStreamerEngine::captureFrame() {
                  nullptr);
     gst_caps_unref(caps);
 
-    // Add elements to pipeline
-    gst_bin_add_many(GST_BIN(pipeline), queue, videoconvert, appsink, nullptr);
+    // Add elements to videoSinkBin (where tee lives)
+    gst_bin_add_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
 
     // Link elements
     if (!gst_element_link_many(queue, videoconvert, appsink, nullptr)) {
         Logger::instance().error("GStreamerEngine: Failed to link screenshot elements");
-        gst_bin_remove_many(GST_BIN(pipeline), queue, videoconvert, appsink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
         return QImage();
     }
 
@@ -489,7 +489,7 @@ QImage GStreamerEngine::captureFrame() {
     GstPad *teeSrcPad = gst_element_request_pad_simple(tee, "src_%u");
     if (!teeSrcPad) {
         Logger::instance().error("GStreamerEngine: Failed to get tee pad for screenshot");
-        gst_bin_remove_many(GST_BIN(pipeline), queue, videoconvert, appsink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
         return QImage();
     }
 
@@ -499,7 +499,7 @@ QImage GStreamerEngine::captureFrame() {
         gst_element_release_request_pad(tee, teeSrcPad);
         gst_object_unref(teeSrcPad);
         gst_object_unref(queueSinkPad);
-        gst_bin_remove_many(GST_BIN(pipeline), queue, videoconvert, appsink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
         return QImage();
     }
     gst_object_unref(queueSinkPad);
@@ -547,7 +547,7 @@ QImage GStreamerEngine::captureFrame() {
     gst_element_set_state(videoconvert, GST_STATE_NULL);
     gst_element_set_state(queue, GST_STATE_NULL);
 
-    gst_bin_remove_many(GST_BIN(pipeline), queue, videoconvert, appsink, nullptr);
+    gst_bin_remove_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
 
     return image;
 #else
@@ -646,88 +646,65 @@ void GStreamerEngine::extractStreamInfo(void *caps) {
 
 void GStreamerEngine::setupPipeline(const QString &uri) {
 #ifndef ANDROID
-    QString pipelineStr = buildPipeline(uri);
-    Logger::instance().debug(QString("GStreamerEngine: Building pipeline: %1").arg(pipelineStr));
-    GError *error = nullptr;
+    Logger::instance().info(QString("GStreamerEngine: Setting up pipeline for: %1").arg(uri));
 
-    pipeline = gst_parse_launch(pipelineStr.toStdString().c_str(), &error);
-
-    if (error) {
-        QString errorMsg = QString::fromUtf8(error->message);
-        Logger::instance().error(QString("GStreamerEngine: Pipeline parse error: %1").arg(errorMsg));
-        if (!pipeline) {
-            emit errorOccurred(errorMsg);
-            g_error_free(error);
-            return;
-        }
-        // Warning but pipeline was created
-        Logger::instance().warning("GStreamerEngine: Pipeline created with warnings");
-        g_error_free(error);
-    }
-
+    // Create playbin3 element directly (not via gst_parse_launch)
+    pipeline = gst_element_factory_make("playbin3", "playbin");
     if (!pipeline) {
-        Logger::instance().error("GStreamerEngine: Failed to create pipeline (unknown error)");
-        emit errorOccurred("Failed to create pipeline");
+        // Fallback to playbin
+        pipeline = gst_element_factory_make("playbin", "playbin");
+    }
+    if (!pipeline) {
+        Logger::instance().error("GStreamerEngine: Failed to create playbin3/playbin");
+        emit errorOccurred("Failed to create playbin");
         return;
     }
 
+    // Set URI
+    g_object_set(pipeline, "uri", uri.toStdString().c_str(), nullptr);
+
+    // Build video sink bin: videoconvert ! tee ! queue ! d3d11videosink
+    videoSinkBin = gst_bin_new("videosinkbin");
+    GstElement *videoconvert = gst_element_factory_make("videoconvert", "videoconvert");
+    tee = gst_element_factory_make("tee", "t");
+    GstElement *queue = gst_element_factory_make("queue", "displayqueue");
+    videoSink = gst_element_factory_make("d3d11videosink", "videosink");
+
+    if (!videoconvert || !tee || !queue || !videoSink) {
+        Logger::instance().error("GStreamerEngine: Failed to create video sink elements");
+        emit errorOccurred("Failed to create video sink elements");
+        gst_object_unref(pipeline);
+        pipeline = nullptr;
+        tee = nullptr;
+        videoSink = nullptr;
+        if (videoconvert) gst_object_unref(videoconvert);
+        if (tee) gst_object_unref(tee);
+        if (queue) gst_object_unref(queue);
+        if (videoSink) gst_object_unref(videoSink);
+        gst_object_unref(videoSinkBin);
+        return;
+    }
+
+    gst_bin_add_many(GST_BIN(videoSinkBin), videoconvert, tee, queue, videoSink, nullptr);
+    gst_element_link(videoconvert, tee);
+    gst_element_link(tee, queue);
+    gst_element_link(queue, videoSink);
+
+    // Create ghost pad so playbin can link to this bin
+    GstPad *sinkPad = gst_element_get_static_pad(videoconvert, "sink");
+    gst_element_add_pad(videoSinkBin, gst_ghost_pad_new("sink", sinkPad));
+    gst_object_unref(sinkPad);
+
+    // Set window handle
+    if (windowHandle != 0) {
+        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
+        Logger::instance().debug(QString("GStreamerEngine: Window handle set: %1").arg(windowHandle));
+    }
+
+    // Set video-sink on playbin
+    g_object_set(pipeline, "video-sink", videoSinkBin, nullptr);
+
     Logger::instance().info("GStreamerEngine: Pipeline created successfully");
-
-    // Get video sink from the video-sink bin
-    videoSink = gst_bin_get_by_name(GST_BIN(pipeline), "videosink");
-    if (!videoSink) {
-        // Try to get from playbin's video-sink property
-        GstElement *playbin = gst_bin_get_by_name(GST_BIN(pipeline), "playbin");
-        if (playbin) {
-            GstElement *videoSinkBin = nullptr;
-            g_object_get(playbin, "video-sink", &videoSinkBin, nullptr);
-            if (videoSinkBin) {
-                videoSink = gst_bin_get_by_name(GST_BIN(videoSinkBin), "videosink");
-                gst_object_unref(videoSinkBin);
-            }
-            gst_object_unref(playbin);
-        }
-    }
-
-    if (!videoSink) {
-        Logger::instance().warning("GStreamerEngine: Video sink not found (audio-only stream?)");
-        // Don't fail - might be audio-only
-    } else {
-        Logger::instance().debug("GStreamerEngine: Video sink obtained");
-
-        // Set window handle if available
-        if (windowHandle != 0) {
-            if (GST_IS_VIDEO_OVERLAY(videoSink)) {
-                gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
-                Logger::instance().debug(QString("GStreamerEngine: Window handle set: %1").arg(windowHandle));
-            } else {
-                Logger::instance().warning("GStreamerEngine: Video sink does not support overlay");
-            }
-        } else {
-            Logger::instance().warning("GStreamerEngine: No window handle available");
-        }
-    }
-
-    // Get tee element (for recording support)
-    tee = gst_bin_get_by_name(GST_BIN(pipeline), "t");
-    if (!tee) {
-        // Try to find tee in video-sink bin
-        GstElement *playbin = gst_bin_get_by_name(GST_BIN(pipeline), "playbin");
-        if (playbin) {
-            GstElement *videoSinkBin = nullptr;
-            g_object_get(playbin, "video-sink", &videoSinkBin, nullptr);
-            if (videoSinkBin) {
-                tee = gst_bin_get_by_name(GST_BIN(videoSinkBin), "t");
-                gst_object_unref(videoSinkBin);
-            }
-            gst_object_unref(playbin);
-        }
-    }
-    if (tee) {
-        Logger::instance().debug("GStreamerEngine: Tee element found");
-    } else {
-        Logger::instance().warning("GStreamerEngine: Tee element not found (recording may not work)");
-    }
 
     // Setup bus
     GstBus *bus = gst_element_get_bus(pipeline);
@@ -750,6 +727,7 @@ void GStreamerEngine::cleanupPipeline() {
         gst_object_unref(pipeline);
         pipeline = nullptr;
         videoSink = nullptr;
+        videoSinkBin = nullptr;
         tee = nullptr;
     }
 #endif
@@ -760,20 +738,15 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     // Use playbin3 for automatic audio/video handling
     // This supports all formats: video, audio, or both
     // Video sink: d3d11videosink on Windows for hardware acceleration
-    // Audio sink: wasapi2sink on Windows
-    //
-    // Note: playbin3 doesn't support tee directly, so recording will need
-    // a different approach (e.g., using pad probes or separate pipeline)
+    // Audio sink: autoaudiosink (auto-detect best audio output)
 
     QString videoSinkName = "d3d11videosink";
-    QString audioSinkName = "wasapi2sink";
 
-    // For now, use a simpler playbin3 approach that handles both audio and video
-    // The tee element is created as a placeholder for future recording support
+    // playbin3 handles audio automatically with default audio sink
+    // Only override video-sink for tee support (recording)
     return QString("playbin3 uri=\"%1\" name=playbin "
-                  "video-sink=\"videoconvert ! tee name=t ! queue name=displayqueue ! %2 name=videosink\" "
-                  "audio-sink=\"audioconvert ! audioresample ! %3 name=audiosink\"")
-        .arg(uri, videoSinkName, audioSinkName);
+                  "video-sink=\"videoconvert ! tee name=t ! queue name=displayqueue ! %2 name=videosink\"")
+        .arg(uri, videoSinkName);
 #else
     (void)uri;
     return "";

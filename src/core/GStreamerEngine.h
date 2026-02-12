@@ -86,6 +86,7 @@ private:
 #ifndef ANDROID
     GstElement *pipeline = nullptr;
     GstElement *videoSink = nullptr;
+    GstElement *videoSinkBin = nullptr;
     GstElement *tee = nullptr;
     GstElement *fileSink = nullptr;
     GstElement *recordingQueue = nullptr;
@@ -94,6 +95,7 @@ private:
 #else
     void *pipeline = nullptr;
     void *videoSink = nullptr;
+    void *videoSinkBin = nullptr;
     void *tee = nullptr;
     void *fileSink = nullptr;
     void *recordingQueue = nullptr;
