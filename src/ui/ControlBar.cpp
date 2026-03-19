@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QStyle>
 #include <QIcon>
+#include <QtGlobal>
 
 ControlBar::ControlBar(QWidget *parent)
     : QWidget(parent)
@@ -19,49 +20,54 @@ ControlBar::ControlBar(QWidget *parent)
     connectSignals();
     setStyleSheet(R"(
         QWidget {
-            background-color: #1a1a2e;
+            background-color: #F5F6F8;
         }
         QPushButton {
-            background-color: #ffffff;
-            border: none;
-            border-radius: 4px;
+            background-color: #FFFFFF;
+            color: #2F343B;
+            border: 1px solid #D7DCE3;
+            border-radius: 6px;
             padding: 8px;
             min-width: 36px;
             min-height: 36px;
         }
         QPushButton:hover {
-            background-color: #e0e0e0;
+            background-color: #F0F2F5;
         }
         QPushButton:pressed {
-            background-color: #c0c0c0;
+            background-color: #E7EAEE;
+        }
+        QPushButton:checked {
+            background-color: #DDE7F8;
+            border-color: #9FB5DE;
         }
         QSlider::groove:horizontal {
             border: none;
             height: 6px;
-            background: #000000;
+            background: #D7DCE3;
             border-radius: 3px;
         }
         QSlider::handle:horizontal {
-            background: #000000;
+            background: #7A97CC;
             border: none;
             width: 14px;
             margin: -4px 0;
             border-radius: 7px;
         }
         QSlider::handle:horizontal:hover {
-            background: #333333;
+            background: #6A87B8;
         }
         QLabel {
-            background: #ffffff;
-            color: #000000;
+            background: transparent;
+            color: #6B7280;
         }
     )");
 }
 
 void ControlBar::setupUI() {
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(10, 5, 10, 5);
-    layout->setSpacing(8);
+    layout->setContentsMargins(14, 8, 14, 8);
+    layout->setSpacing(10);
 
     // Play/Pause button (combined)
     playPauseButton = new QPushButton();
@@ -81,7 +87,7 @@ void ControlBar::setupUI() {
 
     // Recording time label
     recordingTimeLabel = new QLabel("00:00");
-    recordingTimeLabel->setStyleSheet("color: #F44336; font-weight: bold;");
+    recordingTimeLabel->setStyleSheet("color: #D96B6B; font-weight: bold;");
     recordingTimeLabel->setMinimumWidth(50);
     layout->addWidget(recordingTimeLabel);
 
@@ -99,6 +105,7 @@ void ControlBar::setupUI() {
     gridButton->setIcon(QIcon(":/icons/grid"));
     gridButton->setIconSize(QSize(24, 24));
     gridButton->setToolTip(tr("Toggle Grid (G)"));
+    gridButton->setCheckable(true);
     layout->addWidget(gridButton);
 
     // Fullscreen button
@@ -113,7 +120,7 @@ void ControlBar::setupUI() {
     // Volume icon
     volumeLabel = new QLabel();
     volumeLabel->setPixmap(QIcon(":/icons/volume").pixmap(20, 20));
-    volumeLabel->setStyleSheet("background-color: #a2a1a1; padding: 4px; border-radius: 4px;");
+    volumeLabel->setStyleSheet("background-color: #FFFFFF; padding: 6px; border-radius: 6px; border: 1px solid #D7DCE3;");
     layout->addWidget(volumeLabel);
 
     // Volume slider
@@ -125,25 +132,26 @@ void ControlBar::setupUI() {
     volumeSlider->setToolTip(tr("Volume"));
     volumeSlider->setStyleSheet(R"(
         QSlider {
-            background-color: #ffffff;
-            border-radius: 4px;
+            background-color: #FFFFFF;
+            border-radius: 6px;
+            border: 1px solid #D7DCE3;
             padding: 4px;
         }
         QSlider::groove:horizontal {
             border: none;
             height: 6px;
-            background: #000000;
+            background: #D7DCE3;
             border-radius: 3px;
         }
         QSlider::handle:horizontal {
-            background: #000000;
+            background: #7A97CC;
             border: none;
             width: 14px;
             margin: -4px 0;
             border-radius: 7px;
         }
         QSlider::handle:horizontal:hover {
-            background: #333333;
+            background: #6A87B8;
         }
     )");
     layout->addWidget(volumeSlider);
@@ -201,11 +209,11 @@ void ControlBar::setRecordingActive(bool active) {
     isRecording = active;
     if (active) {
         recordButton->setIcon(QIcon(":/icons/stop"));
-        recordButton->setStyleSheet("QPushButton { background-color: #F44336; } QPushButton:hover { background-color: #E53935; } QPushButton:pressed { background-color: #D32F2F; }");
+        recordButton->setStyleSheet("QPushButton { background-color: #F2DCDC; border: 1px solid #D9A9A9; color: #8F4A4A; } QPushButton:hover { background-color: #EDD2D2; } QPushButton:pressed { background-color: #E3C2C2; }");
         recordButton->setToolTip(tr("Stop Recording (R)"));
     } else {
         recordButton->setIcon(QIcon(":/icons/record"));
-        recordButton->setStyleSheet("QPushButton { background-color: #ffffff; } QPushButton:hover { background-color: #e0e0e0; } QPushButton:pressed { background-color: #c0c0c0; }");
+        recordButton->setStyleSheet("QPushButton { background-color: #FFFFFF; color: #2F343B; border: 1px solid #D7DCE3; border-radius: 6px; } QPushButton:hover { background-color: #F0F2F5; } QPushButton:pressed { background-color: #E7EAEE; }");
         recordButton->setToolTip(tr("Record (R)"));
         recordingTimeLabel->setText("00:00");
     }
@@ -219,4 +227,16 @@ void ControlBar::setFullscreen(bool fullscreen) {
         fullscreenButton->setIcon(QIcon(":/icons/fullscreen"));
         fullscreenButton->setToolTip(tr("Fullscreen (F)"));
     }
+}
+
+void ControlBar::setVolume(int volume) {
+    volumeSlider->setValue(qBound(0, volume, 100));
+}
+
+int ControlBar::volume() const {
+    return volumeSlider->value();
+}
+
+void ControlBar::setGridActive(bool active) {
+    gridButton->setChecked(active);
 }

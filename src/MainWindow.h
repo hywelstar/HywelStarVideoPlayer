@@ -55,6 +55,7 @@ private slots:
     void onStreamInfoChanged(int width, int height, int fps, int bitrate);
     void onPlayerStateChanged(int state);
     void onErrorOccurred(const QString &error);
+    void onRecordingStatusChanged(bool recording, qint64 duration, qint64 fileSize);
 
     // Timer slots
     void updateRecordingTime();
@@ -77,6 +78,7 @@ private:
     QTimer *recordingTimer;
     QElapsedTimer recordingElapsed;
     bool isFullScreen = false;
+    bool isGridVisible = false;
 };
 
 #endif // MAINWINDOW_H

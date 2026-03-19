@@ -12,6 +12,7 @@
 #include <QDebug>
 #include <QUrl>
 #include <QFile>
+#include <QtGlobal>
 
 #ifndef ANDROID
 #include <gst/app/gstappsink.h>
@@ -123,17 +124,14 @@ void GStreamerEngine::stop() {
 
 void GStreamerEngine::setVolume(int volume) {
 #ifndef ANDROID
+    currentVolume = qBound(0, volume, 100);
     if (pipeline) {
-        GstElement *audioSink = gst_bin_get_by_name(GST_BIN(pipeline), "audiosink");
-        if (audioSink) {
-            gdouble vol = volume / 100.0;
-            g_object_set(G_OBJECT(audioSink), "volume", vol, nullptr);
-            gst_object_unref(audioSink);
-        }
+        gdouble vol = currentVolume / 100.0;
+        g_object_set(G_OBJECT(pipeline), "volume", vol, nullptr);
     }
 #else
     // Android stub: volume control to be implemented
-    (void)volume;
+    currentVolume = qBound(0, volume, 100);
 #endif
 }
 
@@ -154,10 +152,7 @@ void GStreamerEngine::startRecording(const QString &filepath) {
     isRecordingActive = true;
     currentRecordingPath = filepath;
 
-    // Run the heavy work in background thread
-    (void)QtConcurrent::run([this, filepath]() {
-        doStartRecording(filepath);
-    });
+    doStartRecording(filepath);
 #else
     // Android stub: recording to be implemented
     (void)filepath;
@@ -169,16 +164,20 @@ void GStreamerEngine::startRecording(const QString &filepath) {
 #ifndef ANDROID
 void GStreamerEngine::doStartRecording(const QString &filepath) {
     Logger::instance().info(QString("GStreamerEngine: Starting recording to: %1").arg(filepath));
+    auto fail = [this](const QString &message) {
+        isRecordingActive = false;
+        QMetaObject::invokeMethod(this, [this, message]() {
+            emit errorOccurred(message);
+            emit recordingStatusChanged(false, 0, 0);
+        }, Qt::QueuedConnection);
+    };
 
     // Create recording branch elements:
     // tee -> queue -> videoconvert -> x264enc -> muxer -> filesink
     recordingQueue = gst_element_factory_make("queue", "recordingqueue");
     if (!recordingQueue) {
         Logger::instance().error("GStreamerEngine: Failed to create recording queue");
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to create recording queue");
-        }, Qt::QueuedConnection);
+        fail("Failed to create recording queue");
         return;
     }
 
@@ -187,10 +186,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         Logger::instance().error("GStreamerEngine: Failed to create videoconvert");
         gst_object_unref(recordingQueue);
         recordingQueue = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to create videoconvert");
-        }, Qt::QueuedConnection);
+        fail("Failed to create videoconvert");
         return;
     }
 
@@ -205,10 +201,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         gst_object_unref(recordingQueue);
         gst_object_unref(videoconvert);
         recordingQueue = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to create video encoder");
-        }, Qt::QueuedConnection);
+        fail("Failed to create video encoder");
         return;
     }
 
@@ -225,10 +218,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         gst_object_unref(videoconvert);
         gst_object_unref(encoder);
         recordingQueue = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to create muxer");
-        }, Qt::QueuedConnection);
+        fail("Failed to create muxer");
         return;
     }
 
@@ -241,10 +231,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         gst_object_unref(muxer);
         recordingQueue = nullptr;
         muxer = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to create filesink");
-        }, Qt::QueuedConnection);
+        fail("Failed to create filesink");
         return;
     }
 
@@ -260,10 +247,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to link recording elements");
-        }, Qt::QueuedConnection);
+        fail("Failed to link recording elements");
         return;
     }
 
@@ -275,10 +259,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to get tee src pad");
-        }, Qt::QueuedConnection);
+        fail("Failed to get tee src pad");
         return;
     }
 
@@ -291,10 +272,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to get queue sink pad");
-        }, Qt::QueuedConnection);
+        fail("Failed to get queue sink pad");
         return;
     }
 
@@ -313,10 +291,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
-        isRecordingActive = false;
-        QMetaObject::invokeMethod(this, [this]() {
-            emit errorOccurred("Failed to link tee to recording queue");
-        }, Qt::QueuedConnection);
+        fail("Failed to link tee to recording queue");
         return;
     }
 
@@ -345,10 +320,7 @@ void GStreamerEngine::stopRecording() {
     // Mark as not recording immediately
     isRecordingActive = false;
 
-    // Run the heavy work in background thread
-    (void)QtConcurrent::run([this]() {
-        doStopRecording();
-    });
+    doStopRecording();
 #else
     isRecordingActive = false;
     emit recordingStatusChanged(false, 0, 0);
@@ -366,15 +338,8 @@ void GStreamerEngine::doStopRecording() {
 
     // Send EOS to muxer to properly finalize the file
     if (muxer) {
-        GstPad *muxerSinkPad = gst_element_get_static_pad(muxer, "video_0");
-        if (muxerSinkPad) {
-            gst_pad_send_event(muxerSinkPad, gst_event_new_eos());
-            gst_object_unref(muxerSinkPad);
-        }
+        gst_element_send_event(muxer, gst_event_new_eos());
     }
-
-    // Give some time for EOS to propagate (in background thread, won't block UI)
-    g_usleep(200000); // 200ms
 
     // Get all recording elements by name and remove them
     GstElement *recQueue = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recordingqueue");
@@ -442,6 +407,10 @@ bool GStreamerEngine::isRecording() const {
     return isRecordingActive;
 }
 
+int GStreamerEngine::getVolume() const {
+    return currentVolume;
+}
+
 QImage GStreamerEngine::captureFrame() {
 #ifndef ANDROID
     if (!pipeline || !tee) {
@@ -494,6 +463,14 @@ QImage GStreamerEngine::captureFrame() {
     }
 
     GstPad *queueSinkPad = gst_element_get_static_pad(queue, "sink");
+    if (!queueSinkPad) {
+        Logger::instance().error("GStreamerEngine: Failed to get screenshot queue sink pad");
+        gst_element_release_request_pad(tee, teeSrcPad);
+        gst_object_unref(teeSrcPad);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), queue, videoconvert, appsink, nullptr);
+        return QImage();
+    }
+
     if (gst_pad_link(teeSrcPad, queueSinkPad) != GST_PAD_LINK_OK) {
         Logger::instance().error("GStreamerEngine: Failed to link tee to screenshot queue");
         gst_element_release_request_pad(tee, teeSrcPad);
@@ -509,11 +486,8 @@ QImage GStreamerEngine::captureFrame() {
     gst_element_sync_state_with_parent(videoconvert);
     gst_element_sync_state_with_parent(appsink);
 
-    // Wait a bit for a frame to arrive
-    g_usleep(100000); // 100ms
-
     // Pull sample from appsink
-    GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink), GST_SECOND / 2);
+    GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink), GST_MSECOND * 120);
 
     QImage image;
     if (sample) {
@@ -577,6 +551,24 @@ int GStreamerEngine::busCallback(void *bus, void *msg, void *data) {
 
 #ifndef ANDROID
 void GStreamerEngine::handleBusMessage(GstMessage *msg) {
+    auto refreshStreamInfoFromSink = [this]() {
+        if (!videoSink) {
+            return;
+        }
+
+        GstPad *sinkPad = gst_element_get_static_pad(videoSink, "sink");
+        if (!sinkPad) {
+            return;
+        }
+
+        GstCaps *caps = gst_pad_get_current_caps(sinkPad);
+        if (caps) {
+            extractStreamInfo(caps);
+            gst_caps_unref(caps);
+        }
+        gst_object_unref(sinkPad);
+    };
+
     switch (GST_MESSAGE_TYPE(msg)) {
     case GST_MESSAGE_ERROR: {
         GError *err = nullptr;
@@ -599,6 +591,27 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     case GST_MESSAGE_STATE_CHANGED: {
         GstState oldState, newState, pendingState;
         gst_message_parse_state_changed(msg, &oldState, &newState, &pendingState);
+        if (GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline) && newState == GST_STATE_PLAYING) {
+            refreshStreamInfoFromSink();
+        }
+        Q_UNUSED(oldState)
+        Q_UNUSED(pendingState)
+        break;
+    }
+    case GST_MESSAGE_ASYNC_DONE:
+        refreshStreamInfoFromSink();
+        break;
+    case GST_MESSAGE_TAG: {
+        GstTagList *tags = nullptr;
+        gst_message_parse_tag(msg, &tags);
+        if (tags) {
+            guint bitrate = 0;
+            if (gst_tag_list_get_uint(tags, GST_TAG_BITRATE, &bitrate) && bitrate > 0) {
+                streamInfo.bitrate = static_cast<int>(bitrate);
+                emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
+            }
+            gst_tag_list_unref(tags);
+        }
         break;
     }
     case GST_MESSAGE_ELEMENT: {
@@ -662,6 +675,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
     // Set URI
     g_object_set(pipeline, "uri", uri.toStdString().c_str(), nullptr);
+    g_object_set(G_OBJECT(pipeline), "volume", currentVolume / 100.0, nullptr);
 
     // Build video sink bin: videoconvert ! tee ! queue ! d3d11videosink
     videoSinkBin = gst_bin_new("videosinkbin");
@@ -686,9 +700,18 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     }
 
     gst_bin_add_many(GST_BIN(videoSinkBin), videoconvert, tee, queue, videoSink, nullptr);
-    gst_element_link(videoconvert, tee);
-    gst_element_link(tee, queue);
-    gst_element_link(queue, videoSink);
+    if (!gst_element_link(videoconvert, tee) ||
+        !gst_element_link(tee, queue) ||
+        !gst_element_link(queue, videoSink)) {
+        Logger::instance().error("GStreamerEngine: Failed to link video sink elements");
+        emit errorOccurred("Failed to link video sink elements");
+        gst_object_unref(pipeline);
+        pipeline = nullptr;
+        videoSink = nullptr;
+        videoSinkBin = nullptr;
+        tee = nullptr;
+        return;
+    }
 
     // Create ghost pad so playbin can link to this bin
     GstPad *sinkPad = gst_element_get_static_pad(videoconvert, "sink");

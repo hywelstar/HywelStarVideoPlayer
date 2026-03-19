@@ -22,8 +22,8 @@ QuickConnectBar::QuickConnectBar(QWidget *parent)
 
 void QuickConnectBar::setupUI() {
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(10, 5, 10, 5);
-    layout->setSpacing(8);
+    layout->setContentsMargins(14, 8, 14, 8);
+    layout->setSpacing(10);
 
     // App title label
     titleLabel = new QLabel("HywelStar Player");
@@ -41,41 +41,49 @@ void QuickConnectBar::setupUI() {
     settingsButton->setToolTip(tr("Settings"));
     layout->addWidget(settingsButton);
 
-    // Styles
-    titleLabel->setStyleSheet("background-color: #ffffff; color: #000000; font-weight: bold; padding: 4px 10px; border-radius: 4px;");
+    titleLabel->setStyleSheet(R"(
+        background-color: #FFFFFF;
+        color: #2F343B;
+        font-weight: 700;
+        padding: 6px 10px;
+        border-radius: 6px;
+        border: 1px solid #D7DCE3;
+    )");
 
     uriInput->setStyleSheet(R"(
         QLineEdit {
-            background-color: #ffffff;
-            color: #000000;
-            border: 1px solid #cccccc;
-            border-radius: 4px;
-            padding: 6px 12px;
+            background-color: #FFFFFF;
+            color: #2F343B;
+            border: 1px solid #D7DCE3;
+            border-radius: 6px;
+            padding: 8px 12px;
+            selection-background-color: #DDE7F8;
+            selection-color: #ffffff;
         }
         QLineEdit:focus {
-            border: 1px solid #5c6bc0;
+            border: 1px solid #7A97CC;
         }
     )");
 
     settingsButton->setStyleSheet(R"(
         QPushButton {
-            background-color: #ffffff;
-            color: #000000;
-            border: none;
-            border-radius: 4px;
+            background-color: #FFFFFF;
+            color: #2F343B;
+            border: 1px solid #D7DCE3;
+            border-radius: 6px;
             padding: 8px;
             min-width: 36px;
             min-height: 36px;
         }
         QPushButton:hover {
-            background-color: #e0e0e0;
+            background-color: #F0F2F5;
         }
         QPushButton:pressed {
-            background-color: #c0c0c0;
+            background-color: #E7EAEE;
         }
     )");
 
-    setStyleSheet("QWidget { background-color: #1a1a2e; }");
+    setStyleSheet("QWidget { background-color: #F5F6F8; }");
 }
 
 void QuickConnectBar::connectSignals() {

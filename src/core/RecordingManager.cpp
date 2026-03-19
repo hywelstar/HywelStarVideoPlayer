@@ -91,3 +91,7 @@ QString RecordingManager::getScreenshotPath() const {
 qint64 RecordingManager::getMaxFileSize() const {
     return maxFileSize;
 }
+
+QString RecordingManager::getCurrentFilepath() const {
+    return currentFilepath;
+}

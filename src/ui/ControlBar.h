@@ -31,6 +31,9 @@ public:
     void setRecordingActive(bool active);
     void setFullscreen(bool fullscreen);
     void setPlaybackState(PlaybackState state);
+    void setVolume(int volume);
+    int volume() const;
+    void setGridActive(bool active);
 
 signals:
     void playPauseRequested();

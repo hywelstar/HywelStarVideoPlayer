@@ -23,7 +23,8 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Settings"));
-    setFixedSize(500, 400);
+    resize(560, 440);
+    setMinimumSize(500, 380);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     setupUI();
@@ -121,14 +122,14 @@ void SettingsDialog::setupUI() {
     okButton->setFixedWidth(80);
     okButton->setStyleSheet(R"(
         QPushButton {
-            background-color: #4CAF50;
+            background-color: #7A97CC;
             color: white;
             border: none;
             border-radius: 4px;
             padding: 8px 16px;
         }
         QPushButton:hover {
-            background-color: #66BB6A;
+            background-color: #6A87B8;
         }
     )");
     connect(okButton, &QPushButton::clicked, this, [this]() {

@@ -25,28 +25,42 @@ if exist "build\windows_x64\%BUILD_TYPE%\HywelStarVideoPlayer.exe" (
 
 REM Check for Qt path
 if not defined QT_PATH (
-    if exist "F:\QT\6.10.0\msvc2022_64" (
-        set QT_PATH=F:\QT\6.10.0\msvc2022_64
-    ) else if exist "C:\Qt\6.8.0\msvc2022_64" (
-        set QT_PATH=C:\Qt\6.8.0\msvc2022_64
-    ) else (
-        echo Error: Qt not found. Set QT_PATH environment variable.
-        exit /b 1
-    )
+    if defined QTDIR if exist "%QTDIR%\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=%QTDIR%
+    if not defined QT_PATH if defined Qt6_DIR if exist "%Qt6_DIR%\Qt6Config.cmake" for %%I in ("%Qt6_DIR%\..\..\..") do set QT_PATH=%%~fI
+    if not defined QT_PATH if exist "F:\QT\6.10.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=F:\QT\6.10.0\msvc2022_64
+    if not defined QT_PATH if exist "C:\Qt\6.10.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=C:\Qt\6.10.0\msvc2022_64
+    if not defined QT_PATH if exist "C:\Qt\6.8.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=C:\Qt\6.8.0\msvc2022_64
+)
+
+if not defined QT_PATH (
+    echo Error: Qt not found. Set QT_PATH first, e.g.:
+    echo   set QT_PATH=C:\Qt\6.10.0\msvc2022_64
+    exit /b 1
+)
+
+if not exist "%QT_PATH%\bin\windeployqt.exe" (
+    echo Error: Invalid QT_PATH, missing windeployqt:
+    echo   %QT_PATH%\bin\windeployqt.exe
+    exit /b 1
 )
 
 REM Check for GStreamer path
 if not defined GSTREAMER_PATH (
-    if defined GSTREAMER_1_0_ROOT_MSVC_X86_64 (
-        set GSTREAMER_PATH=%GSTREAMER_1_0_ROOT_MSVC_X86_64%
-    ) else if exist "E:\gstreamer\1.0\msvc_x86_64" (
+    if defined GSTREAMER_ROOT_DIR if exist "%GSTREAMER_ROOT_DIR%\include\gstreamer-1.0\gst\gst.h" set GSTREAMER_PATH=%GSTREAMER_ROOT_DIR%
+    if not defined GSTREAMER_PATH if defined GSTREAMER_1_0_ROOT_MSVC_X86_64 if exist "%GSTREAMER_1_0_ROOT_MSVC_X86_64%\include\gstreamer-1.0\gst\gst.h" set GSTREAMER_PATH=%GSTREAMER_1_0_ROOT_MSVC_X86_64%
+    if not defined GSTREAMER_PATH if exist "E:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
         set GSTREAMER_PATH=E:\gstreamer\1.0\msvc_x86_64
-    ) else if exist "C:\gstreamer\1.0\msvc_x86_64" (
+    ) else if not defined GSTREAMER_PATH if exist "C:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
         set GSTREAMER_PATH=C:\gstreamer\1.0\msvc_x86_64
-    ) else (
-        echo Error: GStreamer not found. Set GSTREAMER_PATH environment variable.
-        exit /b 1
+    ) else if not defined GSTREAMER_PATH if exist "D:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
+        set GSTREAMER_PATH=D:\gstreamer\1.0\msvc_x86_64
     )
+)
+
+if not defined GSTREAMER_PATH (
+    echo Error: GStreamer not found. Set GSTREAMER_PATH first, e.g.:
+    echo   set GSTREAMER_PATH=E:\gstreamer\1.0\msvc_x86_64
+    exit /b 1
 )
 
 echo.
@@ -59,7 +73,9 @@ echo.
 
 REM Deploy Qt dependencies
 echo Deploying Qt dependencies...
-"%QT_PATH%\bin\windeployqt.exe" --no-translations "%EXE_PATH%\HywelStarVideoPlayer.exe"
+set QT_DEPLOY_MODE=--release
+if /I "%BUILD_TYPE%"=="Debug" set QT_DEPLOY_MODE=--debug
+"%QT_PATH%\bin\windeployqt.exe" %QT_DEPLOY_MODE% --compiler-runtime --no-translations "%EXE_PATH%\HywelStarVideoPlayer.exe"
 if errorlevel 1 (
     echo Qt deployment failed!
     exit /b 1
@@ -114,6 +130,13 @@ copy "%GST_PLUGINS%\gstaudioconvert.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>
 copy "%GST_PLUGINS%\gstaudioresample.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstwasapi2.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstvolume.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+
+if not exist "%EXE_PATH%\Qt6Core.dll" (
+    echo Warning: Qt6Core.dll not found in output folder.
+)
+if not exist "%EXE_PATH%\platforms\qwindows.dll" (
+    echo Warning: platforms\qwindows.dll not found. App may fail to start.
+)
 
 echo.
 echo === Deployment Complete ===

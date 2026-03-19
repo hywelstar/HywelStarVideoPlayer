@@ -32,6 +32,7 @@ public:
     QString getRecordingPath() const;
     QString getScreenshotPath() const;
     qint64 getMaxFileSize() const;
+    QString getCurrentFilepath() const;
 
 signals:
     void recordingStarted(const QString &filepath);

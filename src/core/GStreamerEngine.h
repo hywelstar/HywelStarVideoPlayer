@@ -14,8 +14,6 @@
 #include <QString>
 #include <QWindow>
 #include <QImage>
-#include <QFuture>
-#include <QtConcurrent>
 
 #ifndef ANDROID
 #include <gst/gst.h>
@@ -57,6 +55,7 @@ public:
     bool isPlaying() const;
     bool isRecording() const;
     StreamInfo getStreamInfo() const;
+    int getVolume() const;
 
     // Screenshot functionality
     QImage captureFrame();
@@ -109,6 +108,7 @@ private:
     QString currentUri;
     QString currentRecordingPath;
     WId windowHandle = 0;
+    int currentVolume = 50;
 };
 
 #endif // GSTREAMER_ENGINE_H
