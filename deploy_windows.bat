@@ -128,6 +128,11 @@ copy "%GST_PLUGINS%\gstsdpelem.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 REM Audio plugins
 copy "%GST_PLUGINS%\gstaudioconvert.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstaudioresample.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstaudioparsers.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstauparse.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstmpg123.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstopus.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstopusparse.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstwasapi2.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstvolume.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 

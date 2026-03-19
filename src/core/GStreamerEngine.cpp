@@ -12,12 +12,31 @@
 #include <QDebug>
 #include <QUrl>
 #include <QFile>
+#include <QStringList>
 #include <QtGlobal>
 
 #ifndef ANDROID
 #include <gst/app/gstappsink.h>
 #include <gst/video/videooverlay.h>
 #endif
+
+namespace {
+bool isLikelyAudioOnlyUri(const QString &uri) {
+    const QUrl url(uri);
+    const QString path = url.path().toLower();
+
+    static const QStringList audioSuffixes = {
+        ".mp3", ".aac", ".m4a", ".wav", ".flac", ".ogg", ".opus", ".wma", ".amr"
+    };
+
+    for (const QString &suffix : audioSuffixes) {
+        if (path.endsWith(suffix)) {
+            return true;
+        }
+    }
+    return false;
+}
+}
 
 GStreamerEngine::GStreamerEngine(QObject *parent)
     : QObject(parent)
@@ -35,6 +54,23 @@ GStreamerEngine::GStreamerEngine(QObject *parent)
     } else {
         Logger::instance().warning("GStreamerEngine: rtspsrc element NOT found - RTSP streams will not work");
     }
+
+    auto logFeature = [registry](const char *featureName) {
+        GstPluginFeature *f = gst_registry_lookup_feature(registry, featureName);
+        if (f) {
+            Logger::instance().debug(QString("GStreamerEngine: plugin feature available: %1").arg(featureName));
+            gst_object_unref(f);
+        } else {
+            Logger::instance().warning(QString("GStreamerEngine: plugin feature missing: %1").arg(featureName));
+        }
+    };
+    logFeature("rtspsrc");
+    logFeature("rtspsrcdemux");
+    logFeature("rtpmpadepay");
+    logFeature("mpegaudioparse");
+    logFeature("mpg123audiodec");
+    logFeature("avdec_mp3");
+    logFeature("wasapi2sink");
 
     Logger::instance().info("GStreamerEngine: GStreamer initialized successfully");
 #else
@@ -143,8 +179,8 @@ void GStreamerEngine::startRecording(const QString &filepath) {
     }
 
     if (!tee) {
-        Logger::instance().error("GStreamerEngine: Tee element not available for recording");
-        emit errorOccurred("Tee element not available for recording");
+        Logger::instance().error("GStreamerEngine: Recording is only supported for video streams");
+        emit errorOccurred("Recording is only supported for video streams");
         return;
     }
 
@@ -676,6 +712,31 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     // Set URI
     g_object_set(pipeline, "uri", uri.toStdString().c_str(), nullptr);
     g_object_set(G_OBJECT(pipeline), "volume", currentVolume / 100.0, nullptr);
+
+    if (isLikelyAudioOnlyUri(uri)) {
+        Logger::instance().info("GStreamerEngine: Audio-only stream detected, using audio-focused pipeline");
+
+        videoSink = nullptr;
+        videoSinkBin = nullptr;
+        tee = nullptr;
+
+        GstElement *audioSink = gst_element_factory_make("wasapi2sink", "audiosink");
+        if (!audioSink) {
+            audioSink = gst_element_factory_make("autoaudiosink", "audiosink");
+        }
+        if (audioSink) {
+            g_object_set(pipeline, "audio-sink", audioSink, nullptr);
+            gst_object_unref(audioSink);
+        } else {
+            Logger::instance().warning("GStreamerEngine: Failed to create explicit audio sink, using playbin default");
+        }
+
+        GstBus *bus = gst_element_get_bus(pipeline);
+        gst_bus_add_watch(bus, busCallback, this);
+        gst_object_unref(bus);
+        Logger::instance().debug("GStreamerEngine: Bus watch added");
+        return;
+    }
 
     // Build video sink bin: videoconvert ! tee ! queue ! d3d11videosink
     videoSinkBin = gst_bin_new("videosinkbin");
