@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file StatusBar.h
  * @brief Status bar showing stream info and connection status
  * @author hywelstar
@@ -20,6 +20,7 @@ public:
     StatusBar(QWidget *parent = nullptr);
 
     void updateStreamInfo(int width, int height, int fps, int bitrate);
+    void updateLatency(int latencyMs);
     void updateConnectionStatus(const QString &status);
     void updateRecordingStatus(bool recording);
     void showError(const QString &error);
@@ -40,3 +41,4 @@ private:
 };
 
 #endif // STATUS_BAR_H
+

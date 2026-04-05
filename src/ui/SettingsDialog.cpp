@@ -18,6 +18,13 @@
 #include <QSettings>
 #include <QCoreApplication>
 #include <QTabWidget>
+#include <QtGlobal>
+
+namespace {
+constexpr int kMinNetworkLatencyMs = 0;
+constexpr int kMaxNetworkLatencyMs = 5000;
+constexpr int kDefaultNetworkLatencyMs = 0;
+}
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
@@ -66,6 +73,14 @@ void SettingsDialog::setupUI() {
     bufferSizeSpinBox->setSuffix(" ms");
     playbackGrid->addWidget(bufferSizeSpinBox, 2, 1);
 
+    playbackGrid->addWidget(new QLabel(tr("Network latency (ms):")), 3, 0);
+    networkLatencySpinBox = new QSpinBox();
+    networkLatencySpinBox->setRange(kMinNetworkLatencyMs, kMaxNetworkLatencyMs);
+    networkLatencySpinBox->setValue(kDefaultNetworkLatencyMs);
+    networkLatencySpinBox->setSuffix(" ms");
+    networkLatencySpinBox->setToolTip(tr("0 ms for lowest delay; increase when network jitter appears"));
+    playbackGrid->addWidget(networkLatencySpinBox, 3, 1);
+
     playbackLayout->addWidget(playbackGroup);
     playbackLayout->addStretch();
     tabWidget->addTab(playbackTab, tr("Playback"));
@@ -80,8 +95,6 @@ void SettingsDialog::setupUI() {
     recordingGrid->addWidget(new QLabel(tr("Format:")), 0, 0);
     recordingFormatCombo = new QComboBox();
     recordingFormatCombo->addItem("MKV", "mkv");
-    recordingFormatCombo->addItem("MP4", "mp4");
-    recordingFormatCombo->addItem("AVI", "avi");
     recordingGrid->addWidget(recordingFormatCombo, 0, 1, 1, 2);
 
     recordingGrid->addWidget(new QLabel(tr("Recording Path:")), 1, 0);
@@ -153,8 +166,17 @@ void SettingsDialog::loadSettings() {
     loopModeCombo->setCurrentIndex(settings.value("loopMode", 0).toInt());
     autoPlayNextCheck->setChecked(settings.value("autoPlayNext", true).toBool());
     bufferSizeSpinBox->setValue(settings.value("bufferSize", 100).toInt());
+    const int latency = qBound(kMinNetworkLatencyMs,
+                               settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(),
+                               kMaxNetworkLatencyMs);
+    networkLatencySpinBox->setValue(latency);
 
-    recordingFormatCombo->setCurrentText(settings.value("recordingFormat", "MKV").toString());
+    QString recordingFormat = settings.value("recordingFormat", "mkv").toString().toLower();
+    int formatIndex = recordingFormatCombo->findData(recordingFormat);
+    if (formatIndex < 0) {
+        formatIndex = recordingFormatCombo->findData("mkv");
+    }
+    recordingFormatCombo->setCurrentIndex(formatIndex);
     recordingPathEdit->setText(settings.value("recordingPath", appDir + "/video").toString());
     screenshotPathEdit->setText(settings.value("screenshotPath", appDir + "/picture").toString());
 }
@@ -165,8 +187,10 @@ void SettingsDialog::saveSettings() {
     settings.setValue("loopMode", loopModeCombo->currentIndex());
     settings.setValue("autoPlayNext", autoPlayNextCheck->isChecked());
     settings.setValue("bufferSize", bufferSizeSpinBox->value());
+    settings.setValue("networkLatency",
+                      qBound(kMinNetworkLatencyMs, networkLatencySpinBox->value(), kMaxNetworkLatencyMs));
 
-    settings.setValue("recordingFormat", recordingFormatCombo->currentText());
+    settings.setValue("recordingFormat", recordingFormatCombo->currentData().toString());
     settings.setValue("recordingPath", recordingPathEdit->text());
     settings.setValue("screenshotPath", screenshotPathEdit->text());
 }
@@ -187,6 +211,10 @@ int SettingsDialog::getBufferSize() const {
     return bufferSizeSpinBox->value();
 }
 
+
+int SettingsDialog::getNetworkLatency() const {
+    return networkLatencySpinBox->value();
+}
 bool SettingsDialog::getAutoPlayNext() const {
     return autoPlayNextCheck->isChecked();
 }
@@ -214,6 +242,10 @@ void SettingsDialog::setBufferSize(int size) {
     bufferSizeSpinBox->setValue(size);
 }
 
+
+void SettingsDialog::setNetworkLatency(int latencyMs) {
+    networkLatencySpinBox->setValue(qBound(kMinNetworkLatencyMs, latencyMs, kMaxNetworkLatencyMs));
+}
 void SettingsDialog::setAutoPlayNext(bool enabled) {
     autoPlayNextCheck->setChecked(enabled);
 }
@@ -221,3 +253,5 @@ void SettingsDialog::setAutoPlayNext(bool enabled) {
 void SettingsDialog::setLoopMode(int mode) {
     loopModeCombo->setCurrentIndex(mode);
 }
+
+

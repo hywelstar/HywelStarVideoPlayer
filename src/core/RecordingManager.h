@@ -21,9 +21,9 @@ class RecordingManager : public QObject {
 public:
     RecordingManager(QObject *parent = nullptr);
 
-    void startRecording(const QString &format, const QString &quality);
+    void startRecording(const QString &format, const QString &quality, const QString &filepath = QString());
     void stopRecording();
-    QString generateFilename();
+    QString generateFilename(const QString &formatOverride = QString()) const;
     QString generateScreenshotFilename();
     void setRecordingPath(const QString &path);
     void setScreenshotPath(const QString &path);

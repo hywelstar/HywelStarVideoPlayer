@@ -13,12 +13,13 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QApplication>
+#include <Qt>
 
 AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("About"));
-    setFixedSize(400, 300);
+    setFixedSize(420, 340);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -49,6 +50,14 @@ AboutDialog::AboutDialog(QWidget *parent)
     authorLabel->setStyleSheet("font-size: 12px; color: #888;");
     authorLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(authorLabel);
+
+    QLabel *githubLabel = new QLabel("<a href=\"https://github.com/hywelstar/HywelStarVideoPlayer\">GitHub: hywelstar/HywelStarVideoPlayer</a>");
+    githubLabel->setStyleSheet("font-size: 12px; color: #5A7FB8;");
+    githubLabel->setTextFormat(Qt::RichText);
+    githubLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    githubLabel->setOpenExternalLinks(true);
+    githubLabel->setAlignment(Qt::AlignCenter);
+    mainLayout->addWidget(githubLabel);
 
     QLabel *copyrightLabel = new QLabel("(C) 2026 HywelStar. All rights reserved.");
     copyrightLabel->setStyleSheet("font-size: 11px; color: #aaa;");

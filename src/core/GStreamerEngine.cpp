@@ -21,6 +21,10 @@
 #endif
 
 namespace {
+constexpr int kMinNetworkLatencyMs = 0;
+constexpr int kMaxNetworkLatencyMs = 5000;
+constexpr GstClockTime kStutterGapThresholdNs = 80 * GST_MSECOND;
+
 bool isLikelyAudioOnlyUri(const QString &uri) {
     const QUrl url(uri);
     const QString path = url.path().toLower();
@@ -97,23 +101,37 @@ void GStreamerEngine::setWindowHandle(WId windowId) {
 }
 
 void GStreamerEngine::play(const QString &uri) {
-    if (!uri.isEmpty()) {
-        currentUri = uri;
-    }
+    const bool hasNewUri = !uri.isEmpty();
+    const bool uriChanged = hasNewUri && (uri != currentUri);
+    const QString targetUri = hasNewUri ? uri : currentUri;
 
-    if (currentUri.isEmpty()) {
+    if (targetUri.isEmpty()) {
         Logger::instance().error("GStreamerEngine: No URI specified");
         emit errorOccurred("No URI specified");
         return;
     }
 
-    Logger::instance().info(QString("GStreamerEngine: Playing URI: %1").arg(currentUri));
+    Logger::instance().info(QString("GStreamerEngine: Playing URI: %1").arg(targetUri));
 
 #ifndef ANDROID
+    if (pipeline && currentState == PlayerState::Paused && !uriChanged) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+        currentState = PlayerState::Playing;
+        Logger::instance().info("GStreamerEngine: Playback resumed");
+        emit stateChanged(currentState);
+        return;
+    }
+
+    if (pipeline && currentState == PlayerState::Playing && !uriChanged) {
+        Logger::instance().debug("GStreamerEngine: Playback already active");
+        return;
+    }
+
     if (pipeline) {
         cleanupPipeline();
     }
 
+    currentUri = targetUri;
     setupPipeline(currentUri);
 
     if (pipeline) {
@@ -171,17 +189,33 @@ void GStreamerEngine::setVolume(int volume) {
 #endif
 }
 
-void GStreamerEngine::startRecording(const QString &filepath) {
+void GStreamerEngine::setNetworkLatency(int latencyMs) {
+    int oldLatency = networkLatencyMs;
+    networkLatencyMs = qBound(kMinNetworkLatencyMs, latencyMs, kMaxNetworkLatencyMs);
+    if (oldLatency != networkLatencyMs) {
+        Logger::instance().info(QString("GStreamerEngine: Network latency set to %1 ms").arg(networkLatencyMs));
+    }
+#ifndef ANDROID
+    if (pipeline) {
+        GObjectClass *klass = G_OBJECT_GET_CLASS(pipeline);
+        if (klass && g_object_class_find_property(klass, "latency")) {
+            g_object_set(G_OBJECT(pipeline), "latency", networkLatencyMs, nullptr);
+        }
+    }
+#endif
+}
+
+bool GStreamerEngine::startRecording(const QString &filepath) {
 #ifndef ANDROID
     if (!pipeline || isRecordingActive) {
         Logger::instance().warning("GStreamerEngine: Cannot start recording - pipeline not ready or already recording");
-        return;
+        return false;
     }
 
     if (!tee) {
         Logger::instance().error("GStreamerEngine: Recording is only supported for video streams");
         emit errorOccurred("Recording is only supported for video streams");
-        return;
+        return false;
     }
 
     // Mark as recording immediately to prevent double-start
@@ -189,11 +223,13 @@ void GStreamerEngine::startRecording(const QString &filepath) {
     currentRecordingPath = filepath;
 
     doStartRecording(filepath);
+    return isRecordingActive;
 #else
     // Android stub: recording to be implemented
     (void)filepath;
     isRecordingActive = true;
     emit recordingStatusChanged(true, 0, 0);
+    return true;
 #endif
 }
 
@@ -439,6 +475,10 @@ bool GStreamerEngine::isPlaying() const {
     return currentState == PlayerState::Playing;
 }
 
+bool GStreamerEngine::isPaused() const {
+    return currentState == PlayerState::Paused;
+}
+
 bool GStreamerEngine::isRecording() const {
     return isRecordingActive;
 }
@@ -477,6 +517,10 @@ QImage GStreamerEngine::captureFrame() {
                  "max-buffers", 1,
                  "drop", TRUE,
                  "sync", FALSE,
+                 nullptr);
+    g_object_set(queue,
+                 "max-size-buffers", 1,
+                 "leaky", 0,
                  nullptr);
     gst_caps_unref(caps);
 
@@ -522,8 +566,11 @@ QImage GStreamerEngine::captureFrame() {
     gst_element_sync_state_with_parent(videoconvert);
     gst_element_sync_state_with_parent(appsink);
 
-    // Pull sample from appsink
-    GstSample *sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink), GST_MSECOND * 120);
+    // Pull sample from appsink with retries to improve snapshot stability
+    GstSample *sample = nullptr;
+    for (int attempt = 0; attempt < 5 && !sample; ++attempt) {
+        sample = gst_app_sink_try_pull_sample(GST_APP_SINK(appsink), GST_MSECOND * 250);
+    }
 
     QImage image;
     if (sample) {
@@ -576,6 +623,25 @@ gboolean GStreamerEngine::busCallback(GstBus *bus, GstMessage *msg, gpointer dat
     engine->handleBusMessage(msg);
     return TRUE;
 }
+
+GstPadProbeReturn GStreamerEngine::videoProbeCallback(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    if (!user_data || !info) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    if ((GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER) == 0) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    GstBuffer *buffer = gst_pad_probe_info_get_buffer(info);
+    if (!buffer) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    GStreamerEngine *engine = static_cast<GStreamerEngine *>(user_data);
+    engine->handleVideoBuffer(pad, buffer);
+    return GST_PAD_PROBE_OK;
+}
 #else
 int GStreamerEngine::busCallback(void *bus, void *msg, void *data) {
     (void)bus;
@@ -586,6 +652,74 @@ int GStreamerEngine::busCallback(void *bus, void *msg, void *data) {
 #endif
 
 #ifndef ANDROID
+void GStreamerEngine::handleVideoBuffer(GstPad *pad, GstBuffer *buffer) {
+    if (!pad || !buffer) {
+        return;
+    }
+
+    if (statsWindowStartNs == 0) {
+        statsWindowStartNs = gst_util_get_timestamp();
+        statsFrameCount = 0;
+        statsByteCount = 0;
+    }
+
+    statsFrameCount += 1;
+    statsByteCount += gst_buffer_get_size(buffer);
+
+    const GstClockTime nowNs = gst_util_get_timestamp();
+    if (frameLastArrivalNs != 0 && nowNs > frameLastArrivalNs) {
+        const GstClockTime gapNs = nowNs - frameLastArrivalNs;
+        if (gapNs > frameGapMaxNs) {
+            frameGapMaxNs = gapNs;
+        }
+        if (gapNs > kStutterGapThresholdNs) {
+            frameGapSpikeCount += 1;
+        }
+    }
+    frameLastArrivalNs = nowNs;
+
+    const GstClockTime elapsedNs = nowNs - statsWindowStartNs;
+    if (elapsedNs < GST_SECOND) {
+        return;
+    }
+
+    const double elapsedSeconds = static_cast<double>(elapsedNs) / static_cast<double>(GST_SECOND);
+    if (elapsedSeconds <= 0.0) {
+        return;
+    }
+
+    int measuredFps = static_cast<int>((static_cast<double>(statsFrameCount) / elapsedSeconds) + 0.5);
+    int measuredBitrate = static_cast<int>((static_cast<double>(statsByteCount) * 8.0) / elapsedSeconds);
+
+    streamInfo.fps = measuredFps;
+    if (measuredBitrate > 0) {
+        streamInfo.bitrate = measuredBitrate;
+    }
+
+    emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
+
+    // Use configured network latency here to avoid blocking query in streaming thread.
+    emit latencyChanged(networkLatencyMs);
+
+    if (statsLastLogNs == 0 || (nowNs - statsLastLogNs) >= (5 * GST_SECOND)) {
+        const double maxGapMs = static_cast<double>(frameGapMaxNs) / static_cast<double>(GST_MSECOND);
+        const QString statsLine = QString("GStreamerEngine: stream stats fps=%1 bitrate=%2 kbps latency=%3 ms max_gap=%4 ms gap_spikes=%5")
+                                  .arg(streamInfo.fps)
+                                  .arg(streamInfo.bitrate / 1000)
+                                  .arg(networkLatencyMs)
+                                  .arg(maxGapMs, 0, 'f', 1)
+                                  .arg(frameGapSpikeCount);
+        Logger::instance().debug(statsLine);
+        statsLastLogNs = nowNs;
+    }
+
+    statsWindowStartNs = nowNs;
+    statsFrameCount = 0;
+    statsByteCount = 0;
+    frameGapMaxNs = 0;
+    frameGapSpikeCount = 0;
+}
+
 void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     auto refreshStreamInfoFromSink = [this]() {
         if (!videoSink) {
@@ -637,6 +771,41 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     case GST_MESSAGE_ASYNC_DONE:
         refreshStreamInfoFromSink();
         break;
+    case GST_MESSAGE_QOS: {
+        gint64 jitter = 0;
+        gdouble proportion = 1.0;
+        gint quality = 0;
+        gst_message_parse_qos_values(msg, &jitter, &proportion, &quality);
+
+        GstFormat format = GST_FORMAT_UNDEFINED;
+        guint64 processed = 0;
+        guint64 dropped = 0;
+        gst_message_parse_qos_stats(msg, &format, &processed, &dropped);
+
+        const quint64 processedDelta = (processed >= qosLastProcessed) ? (processed - qosLastProcessed) : processed;
+        const quint64 droppedDelta = (dropped >= qosLastDropped) ? (dropped - qosLastDropped) : dropped;
+        qosLastProcessed = processed;
+        qosLastDropped = dropped;
+        qosProcessedTotal += processedDelta;
+        qosDroppedTotal += droppedDelta;
+
+        const GstClockTime nowNs = gst_util_get_timestamp();
+        if (droppedDelta > 0 || qosLastLogNs == 0 || (nowNs - qosLastLogNs) >= (5 * GST_SECOND)) {
+            const double jitterMs = static_cast<double>(jitter) / static_cast<double>(GST_MSECOND);
+            const QString srcName = GST_MESSAGE_SRC(msg) ? QString::fromUtf8(GST_OBJECT_NAME(GST_MESSAGE_SRC(msg))) : QString("unknown");
+            Logger::instance().debug(QString("GStreamerEngine: qos src=%1 delta_processed=%2 delta_dropped=%3 total_processed=%4 total_dropped=%5 jitter=%6 ms proportion=%7 quality=%8")
+                                     .arg(srcName)
+                                     .arg(processedDelta)
+                                     .arg(droppedDelta)
+                                     .arg(qosProcessedTotal)
+                                     .arg(qosDroppedTotal)
+                                     .arg(jitterMs, 0, 'f', 2)
+                                     .arg(proportion, 0, 'f', 3)
+                                     .arg(quality));
+            qosLastLogNs = nowNs;
+        }
+        break;
+    }
     case GST_MESSAGE_TAG: {
         GstTagList *tags = nullptr;
         gst_message_parse_tag(msg, &tags);
@@ -713,6 +882,11 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     g_object_set(pipeline, "uri", uri.toStdString().c_str(), nullptr);
     g_object_set(G_OBJECT(pipeline), "volume", currentVolume / 100.0, nullptr);
 
+    GObjectClass *klass = G_OBJECT_GET_CLASS(pipeline);
+    if (klass && g_object_class_find_property(klass, "latency")) {
+        g_object_set(G_OBJECT(pipeline), "latency", networkLatencyMs, nullptr);
+    }
+
     if (isLikelyAudioOnlyUri(uri)) {
         Logger::instance().info("GStreamerEngine: Audio-only stream detected, using audio-focused pipeline");
 
@@ -738,21 +912,20 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         return;
     }
 
-    // Build video sink bin: videoconvert ! tee ! queue ! d3d11videosink
+    // Build video sink bin: tee ! queue ! d3d11videosink
+    // Keep conversion out of the display hot path to reduce CPU-induced stutter.
     videoSinkBin = gst_bin_new("videosinkbin");
-    GstElement *videoconvert = gst_element_factory_make("videoconvert", "videoconvert");
     tee = gst_element_factory_make("tee", "t");
     GstElement *queue = gst_element_factory_make("queue", "displayqueue");
     videoSink = gst_element_factory_make("d3d11videosink", "videosink");
 
-    if (!videoconvert || !tee || !queue || !videoSink) {
+    if (!tee || !queue || !videoSink) {
         Logger::instance().error("GStreamerEngine: Failed to create video sink elements");
         emit errorOccurred("Failed to create video sink elements");
         gst_object_unref(pipeline);
         pipeline = nullptr;
         tee = nullptr;
         videoSink = nullptr;
-        if (videoconvert) gst_object_unref(videoconvert);
         if (tee) gst_object_unref(tee);
         if (queue) gst_object_unref(queue);
         if (videoSink) gst_object_unref(videoSink);
@@ -760,9 +933,23 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         return;
     }
 
-    gst_bin_add_many(GST_BIN(videoSinkBin), videoconvert, tee, queue, videoSink, nullptr);
-    if (!gst_element_link(videoconvert, tee) ||
-        !gst_element_link(tee, queue) ||
+    // Prefer smooth playback over absolute minimum latency in display path.
+    // A modest queue absorbs short jitter bursts that otherwise show up as visible stutter.
+    g_object_set(queue,
+                 "max-size-buffers", 12,
+                 "max-size-bytes", 0,
+                 "max-size-time", 0,
+                 "leaky", 0,
+                 nullptr);
+
+    // Disable sink clock sync/QoS dropping for live preview smoothness.
+    g_object_set(videoSink,
+                 "sync", FALSE,
+                 "qos", FALSE,
+                 nullptr);
+
+    gst_bin_add_many(GST_BIN(videoSinkBin), tee, queue, videoSink, nullptr);
+    if (!gst_element_link(tee, queue) ||
         !gst_element_link(queue, videoSink)) {
         Logger::instance().error("GStreamerEngine: Failed to link video sink elements");
         emit errorOccurred("Failed to link video sink elements");
@@ -775,7 +962,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     }
 
     // Create ghost pad so playbin can link to this bin
-    GstPad *sinkPad = gst_element_get_static_pad(videoconvert, "sink");
+    GstPad *sinkPad = gst_element_get_static_pad(tee, "sink");
     gst_element_add_pad(videoSinkBin, gst_ghost_pad_new("sink", sinkPad));
     gst_object_unref(sinkPad);
 
@@ -787,6 +974,28 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
     // Set video-sink on playbin
     g_object_set(pipeline, "video-sink", videoSinkBin, nullptr);
+
+    // Probe decoded video buffers for realtime FPS/bitrate in status bar
+    videoProbePad = gst_element_get_static_pad(tee, "sink");
+    if (videoProbePad) {
+        videoProbeId = gst_pad_add_probe(videoProbePad,
+                                         GST_PAD_PROBE_TYPE_BUFFER,
+                                         videoProbeCallback,
+                                         this,
+                                         nullptr);
+    }
+    statsWindowStartNs = 0;
+    statsLastLogNs = 0;
+    statsFrameCount = 0;
+    statsByteCount = 0;
+    frameLastArrivalNs = 0;
+    frameGapMaxNs = 0;
+    frameGapSpikeCount = 0;
+    qosLastLogNs = 0;
+    qosLastProcessed = 0;
+    qosLastDropped = 0;
+    qosProcessedTotal = 0;
+    qosDroppedTotal = 0;
 
     Logger::instance().info("GStreamerEngine: Pipeline created successfully");
 
@@ -805,6 +1014,27 @@ void GStreamerEngine::cleanupPipeline() {
     if (isRecordingActive) {
         stopRecording();
     }
+
+    if (videoProbePad) {
+        if (videoProbeId != 0) {
+            gst_pad_remove_probe(videoProbePad, videoProbeId);
+            videoProbeId = 0;
+        }
+        gst_object_unref(videoProbePad);
+        videoProbePad = nullptr;
+    }
+    statsWindowStartNs = 0;
+    statsLastLogNs = 0;
+    statsFrameCount = 0;
+    statsByteCount = 0;
+    frameLastArrivalNs = 0;
+    frameGapMaxNs = 0;
+    frameGapSpikeCount = 0;
+    qosLastLogNs = 0;
+    qosLastProcessed = 0;
+    qosLastDropped = 0;
+    qosProcessedTotal = 0;
+    qosDroppedTotal = 0;
 
     if (pipeline) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -836,3 +1066,33 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

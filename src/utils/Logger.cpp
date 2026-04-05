@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QCoreApplication>
 #include <QDir>
+#include <QMutexLocker>
 #include <iostream>
 
 Logger::Logger() {
@@ -25,7 +26,12 @@ Logger::Logger() {
 }
 
 Logger::~Logger() {
+    QMutexLocker locker(&logMutex);
     if (logFile.isOpen()) {
+        if (bufferedLineCount > 0) {
+            logStream.flush();
+            bufferedLineCount = 0;
+        }
         logFile.close();
     }
 }
@@ -40,7 +46,12 @@ void Logger::setLogLevel(LogLevel level) {
 }
 
 void Logger::setLogFile(const QString &filepath) {
+    QMutexLocker locker(&logMutex);
     if (logFile.isOpen()) {
+        if (bufferedLineCount > 0) {
+            logStream.flush();
+            bufferedLineCount = 0;
+        }
         logFile.close();
     }
     logFile.setFileName(filepath);
@@ -93,10 +104,16 @@ void Logger::log(LogLevel level, const QString &message) {
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
     QString logMessage = QString("[%1] %2: %3").arg(timestamp, levelStr, message);
 
-    std::cout << logMessage.toStdString() << std::endl;
+    std::cout << logMessage.toStdString() << '\n';
 
+    QMutexLocker locker(&logMutex);
     if (logFile.isOpen()) {
         logStream << logMessage << "\n";
-        logStream.flush();
+        bufferedLineCount += 1;
+        if (level >= LogLevel::Error || bufferedLineCount >= 50) {
+            logStream.flush();
+            bufferedLineCount = 0;
+        }
     }
 }
+

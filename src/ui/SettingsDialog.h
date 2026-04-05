@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file SettingsDialog.h
  * @brief Settings dialog for application configuration
  * @author hywelstar
@@ -27,6 +27,7 @@ public:
     QString getScreenshotPath() const;
     QString getRecordingFormat() const;
     int getBufferSize() const;
+    int getNetworkLatency() const;
     bool getAutoPlayNext() const;
     int getLoopMode() const;
 
@@ -35,6 +36,7 @@ public:
     void setScreenshotPath(const QString &path);
     void setRecordingFormat(const QString &format);
     void setBufferSize(int size);
+    void setNetworkLatency(int latencyMs);
     void setAutoPlayNext(bool enabled);
     void setLoopMode(int mode);
 
@@ -47,6 +49,7 @@ private:
     QComboBox *loopModeCombo;
     QCheckBox *autoPlayNextCheck;
     QSpinBox *bufferSizeSpinBox;
+    QSpinBox *networkLatencySpinBox;
 
     // Recording settings
     QComboBox *recordingFormatCombo;
@@ -55,3 +58,4 @@ private:
 };
 
 #endif // SETTINGS_DIALOG_H
+

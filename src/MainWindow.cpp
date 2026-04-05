@@ -31,6 +31,10 @@
 #include <QtGlobal>
 
 namespace {
+constexpr int kMinNetworkLatencyMs = 0;
+constexpr int kMaxNetworkLatencyMs = 5000;
+constexpr int kDefaultNetworkLatencyMs = 0;
+
 bool isValidStreamUri(const QString &uri) {
     if (uri.isEmpty()) {
         return false;
@@ -112,6 +116,10 @@ void MainWindow::setupMenuBar() {
     QMenu *helpMenu = menuBar->addMenu(tr("Help"));
     QAction *aboutAction = helpMenu->addAction(tr("About"));
     connect(aboutAction, &QAction::triggered, this, &MainWindow::onShowAbout);
+    QAction *settingsTopAction = menuBar->addAction(tr("Settings"));
+    connect(settingsTopAction, &QAction::triggered, this, &MainWindow::onShowSettings);
+    QAction *aboutTopAction = menuBar->addAction(tr("About"));
+    connect(aboutTopAction, &QAction::triggered, this, &MainWindow::onShowAbout);
 
     setMenuBar(menuBar);
 }
@@ -172,6 +180,8 @@ void MainWindow::connectSignals() {
     // GStreamer engine signals
     connect(gstreamerEngine.get(), QOverload<int, int, int, int>::of(&GStreamerEngine::streamInfoChanged),
             this, &MainWindow::onStreamInfoChanged);
+    connect(gstreamerEngine.get(), &GStreamerEngine::latencyChanged,
+            statusBar.get(), &StatusBar::updateLatency);
     connect(gstreamerEngine.get(), QOverload<PlayerState>::of(&GStreamerEngine::stateChanged),
             this, [this](PlayerState state) { onPlayerStateChanged((int)state); });
     connect(gstreamerEngine.get(), &GStreamerEngine::errorOccurred,
@@ -197,12 +207,16 @@ void MainWindow::onShowSettings() {
     dialog.setRecordingPath(recordingManager->getRecordingPath());
     dialog.setScreenshotPath(recordingManager->getScreenshotPath());
     dialog.setRecordingFormat(settings.value("recordingFormat", "mkv").toString().toLower());
+    dialog.setNetworkLatency(qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs));
 
     if (dialog.exec() == QDialog::Accepted) {
         recordingManager->setRecordingPath(dialog.getRecordingPath());
         recordingManager->setScreenshotPath(dialog.getScreenshotPath());
         settings.setValue("recordingFormat", dialog.getRecordingFormat());
-        Logger::instance().info("MainWindow: Settings updated");
+        const int networkLatency = qBound(kMinNetworkLatencyMs, dialog.getNetworkLatency(), kMaxNetworkLatencyMs);
+        settings.setValue("networkLatency", networkLatency);
+        gstreamerEngine->setNetworkLatency(networkLatency);
+        Logger::instance().info(QString("MainWindow: Settings updated (latency=%1 ms, format=%2)").arg(networkLatency).arg(dialog.getRecordingFormat()));
     }
 }
 
@@ -237,10 +251,21 @@ void MainWindow::onStartRecording() {
 
     QSettings settings("HywelStar", "HywelStarVideoPlayer");
     QString format = settings.value("recordingFormat", "mkv").toString().toLower();
-    recordingManager->startRecording(format, "high");
-    QString filepath = recordingManager->getCurrentFilepath();
+    if (format != "mkv") {
+        Logger::instance().warning(QString("MainWindow: Unsupported recording format '%1', falling back to mkv").arg(format));
+        statusBar->showError("Only MKV recording is currently supported");
+        format = "mkv";
+        settings.setValue("recordingFormat", format);
+    }
+
+    const QString filepath = recordingManager->generateFilename(format);
     Logger::instance().info(QString("MainWindow: Starting recording to: %1").arg(filepath));
-    gstreamerEngine->startRecording(filepath);
+
+    if (gstreamerEngine->startRecording(filepath)) {
+        recordingManager->startRecording(format, "high", filepath);
+    } else {
+        Logger::instance().warning("MainWindow: Recording start request rejected");
+    }
 }
 
 void MainWindow::onStopRecording() {
@@ -418,17 +443,17 @@ void MainWindow::loadSettings() {
     controlBar->setVolume(volume);
     gstreamerEngine->setVolume(volume);
 
+    // Network latency
+    int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
+    gstreamerEngine->setNetworkLatency(networkLatency);
+
     // Recording paths
     QString recordingPath = settings.value("recordingPath", "").toString();
-    if (!recordingPath.isEmpty()) {
-        recordingManager->setRecordingPath(recordingPath);
-    }
+    recordingManager->setRecordingPath(recordingPath);
     QString screenshotPath = settings.value("screenshotPath", "").toString();
-    if (!screenshotPath.isEmpty()) {
-        recordingManager->setScreenshotPath(screenshotPath);
-    }
+    recordingManager->setScreenshotPath(screenshotPath);
 
-    Logger::instance().debug("MainWindow: Settings loaded");
+    Logger::instance().debug(QString("MainWindow: Settings loaded (volume=%1, latency=%2 ms)").arg(volume).arg(networkLatency));
 }
 
 void MainWindow::saveSettings() {
@@ -443,9 +468,15 @@ void MainWindow::saveSettings() {
     // Volume
     settings.setValue("volume", controlBar->volume());
 
+    // Network latency
+    int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
+    settings.setValue("networkLatency", networkLatency);
+
     // Recording paths
     settings.setValue("recordingPath", recordingManager->getRecordingPath());
     settings.setValue("screenshotPath", recordingManager->getScreenshotPath());
 
     Logger::instance().debug("MainWindow: Settings saved");
 }
+
+

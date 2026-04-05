@@ -13,6 +13,7 @@
 #include <QString>
 #include <QFile>
 #include <QTextStream>
+#include <QMutex>
 
 enum class LogLevel {
     Debug,
@@ -42,6 +43,8 @@ private:
     LogLevel currentLevel = LogLevel::Info;
     QFile logFile;
     QTextStream logStream;
+    QMutex logMutex;
+    int bufferedLineCount = 0;
 };
 
 #endif // LOGGER_H

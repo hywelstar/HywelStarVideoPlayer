@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file ControlBar.cpp
  * @brief Playback control bar implementation
  * @author hywelstar
@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QStyle>
 #include <QIcon>
+#include <QSizePolicy>
 #include <QtGlobal>
 
 ControlBar::ControlBar(QWidget *parent)
@@ -48,14 +49,14 @@ ControlBar::ControlBar(QWidget *parent)
             border-radius: 3px;
         }
         QSlider::handle:horizontal {
-            background: #7A97CC;
+            background: #2F343B;
             border: none;
             width: 14px;
             margin: -4px 0;
             border-radius: 7px;
         }
         QSlider::handle:horizontal:hover {
-            background: #6A87B8;
+            background: #2F343B;
         }
         QLabel {
             background: transparent;
@@ -128,7 +129,9 @@ void ControlBar::setupUI() {
     volumeSlider->setMinimum(0);
     volumeSlider->setMaximum(100);
     volumeSlider->setValue(50);
-    volumeSlider->setFixedWidth(120);
+    volumeSlider->setMinimumWidth(60);
+    volumeSlider->setMaximumWidth(132);
+    volumeSlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     volumeSlider->setToolTip(tr("Volume"));
     volumeSlider->setStyleSheet(R"(
         QSlider {
@@ -144,14 +147,14 @@ void ControlBar::setupUI() {
             border-radius: 3px;
         }
         QSlider::handle:horizontal {
-            background: #7A97CC;
+            background: #2F343B;
             border: none;
             width: 14px;
             margin: -4px 0;
             border-radius: 7px;
         }
         QSlider::handle:horizontal:hover {
-            background: #6A87B8;
+            background: #2F343B;
         }
     )");
     layout->addWidget(volumeSlider);
@@ -207,13 +210,16 @@ void ControlBar::setRecordingTime(qint64 milliseconds) {
 
 void ControlBar::setRecordingActive(bool active) {
     isRecording = active;
+    recordButton->setProperty("recording", active);
+    recordButton->style()->unpolish(recordButton);
+    recordButton->style()->polish(recordButton);
+    recordButton->update();
+
     if (active) {
         recordButton->setIcon(QIcon(":/icons/stop"));
-        recordButton->setStyleSheet("QPushButton { background-color: #F2DCDC; border: 1px solid #D9A9A9; color: #8F4A4A; } QPushButton:hover { background-color: #EDD2D2; } QPushButton:pressed { background-color: #E3C2C2; }");
         recordButton->setToolTip(tr("Stop Recording (R)"));
     } else {
         recordButton->setIcon(QIcon(":/icons/record"));
-        recordButton->setStyleSheet("QPushButton { background-color: #FFFFFF; color: #2F343B; border: 1px solid #D7DCE3; border-radius: 6px; } QPushButton:hover { background-color: #F0F2F5; } QPushButton:pressed { background-color: #E7EAEE; }");
         recordButton->setToolTip(tr("Record (R)"));
         recordingTimeLabel->setText("00:00");
     }
@@ -240,3 +246,10 @@ int ControlBar::volume() const {
 void ControlBar::setGridActive(bool active) {
     gridButton->setChecked(active);
 }
+
+
+
+
+
+
+

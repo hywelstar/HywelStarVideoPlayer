@@ -15,28 +15,16 @@
 RecordingManager::RecordingManager(QObject *parent)
     : QObject(parent)
 {
-    // Use application directory for video and picture storage
-    QString appDir = QCoreApplication::applicationDirPath();
-
-    // Setup video recording path
-    recordingPath = appDir + "/video";
-    QDir videoDir(recordingPath);
-    if (!videoDir.exists()) {
-        videoDir.mkpath(recordingPath);
-    }
-
-    // Setup screenshot path
-    screenshotPath = appDir + "/picture";
-    QDir pictureDir(screenshotPath);
-    if (!pictureDir.exists()) {
-        pictureDir.mkpath(screenshotPath);
-    }
+    // Default to directories under current executable path
+    const QString appDir = QCoreApplication::applicationDirPath();
+    setRecordingPath(appDir + "/video");
+    setScreenshotPath(appDir + "/picture");
 }
 
-void RecordingManager::startRecording(const QString &format, const QString &quality) {
+void RecordingManager::startRecording(const QString &format, const QString &quality, const QString &filepath) {
     currentFormat = format;
     currentQuality = quality;
-    currentFilepath = generateFilename();
+    currentFilepath = filepath.isEmpty() ? generateFilename(format) : filepath;
     recordingTimer.start();
     emit recordingStarted(currentFilepath);
 }
@@ -46,9 +34,14 @@ void RecordingManager::stopRecording() {
     emit recordingStopped(currentFilepath, 0);
 }
 
-QString RecordingManager::generateFilename() {
+QString RecordingManager::generateFilename(const QString &formatOverride) const {
+    QDir().mkpath(recordingPath);
+
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-    QString extension = currentFormat.isEmpty() ? "mkv" : currentFormat;
+    QString extension = formatOverride.isEmpty() ? currentFormat : formatOverride;
+    if (extension.isEmpty()) {
+        extension = "mkv";
+    }
     if (!extension.startsWith(".")) {
         extension = "." + extension;
     }
@@ -56,12 +49,15 @@ QString RecordingManager::generateFilename() {
 }
 
 QString RecordingManager::generateScreenshotFilename() {
+    QDir().mkpath(screenshotPath);
+
     QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss-zzz");
     return screenshotPath + "/" + "screenshot_" + timestamp + ".png";
 }
 
 void RecordingManager::setRecordingPath(const QString &path) {
-    recordingPath = path;
+    const QString appDir = QCoreApplication::applicationDirPath();
+    recordingPath = path.trimmed().isEmpty() ? (appDir + "/video") : path;
     QDir dir(recordingPath);
     if (!dir.exists()) {
         dir.mkpath(recordingPath);
@@ -69,7 +65,8 @@ void RecordingManager::setRecordingPath(const QString &path) {
 }
 
 void RecordingManager::setScreenshotPath(const QString &path) {
-    screenshotPath = path;
+    const QString appDir = QCoreApplication::applicationDirPath();
+    screenshotPath = path.trimmed().isEmpty() ? (appDir + "/picture") : path;
     QDir dir(screenshotPath);
     if (!dir.exists()) {
         dir.mkpath(screenshotPath);

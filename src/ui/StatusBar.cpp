@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file StatusBar.cpp
  * @brief Status bar implementation
  * @author hywelstar
@@ -102,10 +102,16 @@ void StatusBar::updateStreamInfo(int width, int height, int fps, int bitrate) {
         bitrateLabel->setStyleSheet("color: #6B7280;");
     }
 
-    delayLabel->setText("N/A");
-    delayLabel->setStyleSheet("color: #6B7280;");
 }
 
+void StatusBar::updateLatency(int latencyMs) {
+    if (latencyMs >= 0) {
+        delayLabel->setText(QString("%1 ms").arg(latencyMs));
+        delayLabel->setStyleSheet(latencyMs <= 200 ? "color: #4FA07A;" : "color: #D9A441;");
+    } else {
+        delayLabel->setText("-- ms");
+    }
+}
 void StatusBar::updateConnectionStatus(const QString &status) {
     connectionLabel->setText(status);
     if (status.contains("Connected") || status.contains("Playing")) {
@@ -131,3 +137,6 @@ void StatusBar::showError(const QString &error) {
     connectionLabel->setText("Error: " + error);
     connectionLabel->setStyleSheet("color: #D96B6B; font-weight: bold;");
 }
+
+
+
