@@ -25,7 +25,6 @@
 #include <QImage>
 #include <QSettings>
 #include <QMenuBar>
-#include <QMenu>
 #include <QAction>
 #include <QUrl>
 #include <QtGlobal>
@@ -112,10 +111,6 @@ void MainWindow::setupMenuBar() {
             background-color: #EEF2F7;
         }
     )");
-
-    QMenu *helpMenu = menuBar->addMenu(tr("Help"));
-    QAction *aboutAction = helpMenu->addAction(tr("About"));
-    connect(aboutAction, &QAction::triggered, this, &MainWindow::onShowAbout);
     QAction *settingsTopAction = menuBar->addAction(tr("Settings"));
     connect(settingsTopAction, &QAction::triggered, this, &MainWindow::onShowSettings);
     QAction *aboutTopAction = menuBar->addAction(tr("About"));
@@ -478,5 +473,9 @@ void MainWindow::saveSettings() {
 
     Logger::instance().debug("MainWindow: Settings saved");
 }
+
+
+
+
 
 

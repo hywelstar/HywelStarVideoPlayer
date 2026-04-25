@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QApplication>
 #include <Qt>
+#include <QPixmap>
 
 AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
@@ -27,7 +28,9 @@ AboutDialog::AboutDialog(QWidget *parent)
     mainLayout->setContentsMargins(30, 30, 30, 30);
 
     QLabel *iconLabel = new QLabel();
-    iconLabel->setPixmap(QIcon(":/icons/app_icon").pixmap(64, 64));
+    iconLabel->setFixedSize(112, 112);
+    QPixmap iconPixmap = QIcon(":/icons/app_icon").pixmap(QSize(96, 96));
+    iconLabel->setPixmap(iconPixmap.scaled(92, 92, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     iconLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(iconLabel);
 
@@ -87,3 +90,6 @@ AboutDialog::AboutDialog(QWidget *parent)
     buttonLayout->addStretch();
     mainLayout->addLayout(buttonLayout);
 }
+
+
+

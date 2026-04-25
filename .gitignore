@@ -131,3 +131,7 @@ desktop.ini
 ehthumbs.db
 .Spotlight-V100
 .Trashes
+env.local.bat
+dist/
+
+

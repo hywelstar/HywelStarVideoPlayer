@@ -6,6 +6,11 @@ REM HywelStar Video Player - Windows Deployment Script
 REM Usage: deploy_windows.bat [Release|Debug]
 REM ============================================================================
 
+set "SCRIPT_DIR=%~dp0"
+if exist "%SCRIPT_DIR%env.local.bat" (
+    call "%SCRIPT_DIR%env.local.bat"
+)
+
 set BUILD_TYPE=%1
 if "%BUILD_TYPE%"=="" set BUILD_TYPE=Release
 
@@ -27,13 +32,17 @@ REM Check for Qt path
 if not defined QT_PATH (
     if defined QTDIR if exist "%QTDIR%\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=%QTDIR%
     if not defined QT_PATH if defined Qt6_DIR if exist "%Qt6_DIR%\Qt6Config.cmake" for %%I in ("%Qt6_DIR%\..\..\..") do set QT_PATH=%%~fI
-    if not defined QT_PATH if exist "F:\QT\6.10.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=F:\QT\6.10.0\msvc2022_64
-    if not defined QT_PATH if exist "C:\Qt\6.10.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=C:\Qt\6.10.0\msvc2022_64
-    if not defined QT_PATH if exist "C:\Qt\6.8.0\msvc2022_64\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=C:\Qt\6.8.0\msvc2022_64
+    if not defined QT_PATH (
+        for /f "delims=" %%I in ('where windeployqt 2^>nul') do (
+            for %%J in ("%%~dpI..") do (
+                if exist "%%~fJ\lib\cmake\Qt6\Qt6Config.cmake" set QT_PATH=%%~fJ
+            )
+        )
+    )
 )
 
 if not defined QT_PATH (
-    echo Error: Qt not found. Set QT_PATH first, e.g.:
+    echo Error: Qt not found. Set QT_PATH in env.local.bat or shell, e.g.:
     echo   set QT_PATH=C:\Qt\6.10.0\msvc2022_64
     exit /b 1
 )
@@ -48,17 +57,17 @@ REM Check for GStreamer path
 if not defined GSTREAMER_PATH (
     if defined GSTREAMER_ROOT_DIR if exist "%GSTREAMER_ROOT_DIR%\include\gstreamer-1.0\gst\gst.h" set GSTREAMER_PATH=%GSTREAMER_ROOT_DIR%
     if not defined GSTREAMER_PATH if defined GSTREAMER_1_0_ROOT_MSVC_X86_64 if exist "%GSTREAMER_1_0_ROOT_MSVC_X86_64%\include\gstreamer-1.0\gst\gst.h" set GSTREAMER_PATH=%GSTREAMER_1_0_ROOT_MSVC_X86_64%
-    if not defined GSTREAMER_PATH if exist "E:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
-        set GSTREAMER_PATH=E:\gstreamer\1.0\msvc_x86_64
-    ) else if not defined GSTREAMER_PATH if exist "C:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
-        set GSTREAMER_PATH=C:\gstreamer\1.0\msvc_x86_64
-    ) else if not defined GSTREAMER_PATH if exist "D:\gstreamer\1.0\msvc_x86_64\include\gstreamer-1.0\gst\gst.h" (
-        set GSTREAMER_PATH=D:\gstreamer\1.0\msvc_x86_64
+    if not defined GSTREAMER_PATH (
+        for /f "delims=" %%I in ('where gst-launch-1.0 2^>nul') do (
+            for %%J in ("%%~dpI..") do (
+                if exist "%%~fJ\include\gstreamer-1.0\gst\gst.h" set GSTREAMER_PATH=%%~fJ
+            )
+        )
     )
 )
 
 if not defined GSTREAMER_PATH (
-    echo Error: GStreamer not found. Set GSTREAMER_PATH first, e.g.:
+    echo Error: GStreamer not found. Set GSTREAMER_PATH or GSTREAMER_ROOT_DIR in env.local.bat or shell, e.g.:
     echo   set GSTREAMER_PATH=E:\gstreamer\1.0\msvc_x86_64
     exit /b 1
 )

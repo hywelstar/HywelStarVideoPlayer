@@ -59,9 +59,15 @@ message(STATUS "Platform: ${CMAKE_SYSTEM_NAME}")
 # ============================================================================
 # Output Directories (Qt Creator style)
 # ============================================================================
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+if(CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+else()
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
 
 # ============================================================================
 # Qt6 Configuration
@@ -88,10 +94,13 @@ message(STATUS "Qt6 Path: ${Qt6_DIR}")
 # ============================================================================
 # GStreamer Configuration
 # ============================================================================
-find_package(GStreamer 1.20 REQUIRED)
-
-message(STATUS "GStreamer Version: ${GStreamer_VERSION}")
-message(STATUS "GStreamer Path: ${GStreamer_ROOT_DIR}")
+if(NOT ANDROID)
+    find_package(GStreamer 1.20 REQUIRED)
+    message(STATUS "GStreamer Version: ${GStreamer_VERSION}")
+    message(STATUS "GStreamer Path: ${GStreamer_ROOT_DIR}")
+else()
+    message(STATUS "Android build: GStreamer dependency is disabled (stub engine mode)")
+endif()
 
 # ============================================================================
 # Source Files
@@ -142,14 +151,29 @@ qt_add_executable(${PROJECT_NAME}
     ${RESOURCES}
 )
 
+if(ANDROID)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        QT_ANDROID_MIN_SDK_VERSION 28
+        QT_ANDROID_TARGET_SDK_VERSION 35
+        QT_ANDROID_COMPILE_SDK_VERSION 35
+        QT_ANDROID_SDK_BUILD_TOOLS_REVISION 36.1.0
+    )
+endif()
+
 # ============================================================================
 # Include Directories
 # ============================================================================
 target_include_directories(${PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${GStreamer_INCLUDE_DIRS}
 )
+
+if(NOT ANDROID)
+    target_include_directories(${PROJECT_NAME}
+        PRIVATE
+            ${GStreamer_INCLUDE_DIRS}
+    )
+endif()
 
 # ============================================================================
 # Link Libraries
@@ -160,13 +184,19 @@ target_link_libraries(${PROJECT_NAME}
         Qt6::Gui
         Qt6::Widgets
         Qt6::Concurrent
-        ${GStreamer_LIBRARIES}
 )
+
+if(NOT ANDROID)
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+            ${GStreamer_LIBRARIES}
+    )
+endif()
 
 # ============================================================================
 # Link Directories
 # ============================================================================
-if(GStreamer_LIBRARY_DIRS)
+if(NOT ANDROID AND GStreamer_LIBRARY_DIRS)
     target_link_directories(${PROJECT_NAME}
         PRIVATE
             ${GStreamer_LIBRARY_DIRS}
@@ -185,10 +215,18 @@ endif()
 # ============================================================================
 # Installation
 # ============================================================================
-install(TARGETS ${PROJECT_NAME}
-    BUNDLE DESTINATION .
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+if(ANDROID)
+    install(TARGETS ${PROJECT_NAME}
+        BUNDLE DESTINATION .
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+else()
+    install(TARGETS ${PROJECT_NAME}
+        BUNDLE DESTINATION .
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
 
 # ============================================================================
 # Build Summary

@@ -1,4 +1,4 @@
-# HywelStar Video Player
+# HywelStar  Player
 
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
 
@@ -8,7 +8,7 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| Windows x64 | ✅ Done | Qt 6.10 + GStreamer 1.22 |
+| Windows x64 | �?Done | Qt 6.10 + GStreamer 1.22 |
 | Linux x64 | 🔲 Planned | - |
 | macOS | 🔲 Planned | - |
 | Android arm64-v8a | 🚧 In Progress | GStreamer integration pending |
@@ -18,20 +18,20 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| RTSP Stream Playback | ✅ Done | H.264/H.265 |
-| UDP Stream Playback | ✅ Done | H.264/H.265 |
-| HTTP/HTTPS Playback | ✅ Done | - |
-| Local File Playback | ✅ Done | MP4, MKV, AVI, etc. |
-| Video Recording | ✅ Done | MKV format |
-| Screenshot | ✅ Done | PNG format |
-| Grid Overlay | ✅ Done | For positioning |
-| Fullscreen Mode | ✅ Done | F key / double-click |
-| Volume Control | ✅ Done | Slider + mute |
-| Settings Persistence | ✅ Done | Window size, URI, volume |
-| Recording Timer | ✅ Done | Real-time display |
-| Menu Bar | ✅ Done | Help > About |
-| Settings Dialog | ✅ Done | Recording/Screenshot paths |
-| About Dialog | ✅ Done | App info |
+| RTSP Stream Playback | �?Done | H.264/H.265 |
+| UDP Stream Playback | �?Done | H.264/H.265 |
+| HTTP/HTTPS Playback | �?Done | - |
+| Local File Playback | �?Done | MP4, MKV, AVI, etc. |
+| Video Recording | �?Done | MKV format |
+| Screenshot | �?Done | PNG format |
+| Grid Overlay | �?Done | For positioning |
+| Fullscreen Mode | �?Done | F key / double-click |
+| Volume Control | �?Done | Slider + mute |
+| Settings Persistence | �?Done | Window size, URI, volume |
+| Recording Timer | �?Done | Real-time display |
+| Menu Bar | �?Done | Help > About |
+| Settings Dialog | �?Done | Recording/Screenshot paths |
+| About Dialog | �?Done | App info |
 | Local Playlist | 🔲 Planned | File/folder selection |
 | Playback Speed Control | 🔲 Planned | 0.5x - 2x |
 | Subtitle Support | 🔲 Planned | SRT, ASS |
@@ -82,47 +82,40 @@ brew install qt@6 gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad
 
 ## Build Instructions
 
-### Option 1: Build Script (Windows)
+### 1) Local Environment Config (Recommended)
 
-```bash
-build_windows.bat
+Copy local template once, then edit paths for your machine:
+
+```bat
+copy env.local.example.bat env.local.bat
 ```
 
-### Option 2: Qt Creator (Recommended)
+Build scripts auto-load `env.local.bat` if it exists.
 
-1. Open Qt Creator
-2. File → Open File or Project → Select `CMakeLists.txt`
-3. Configure the project with your Qt kit
-4. Build → Build Project
+### 2) Windows Build
 
-### Option 3: Command Line
-
-```bash
-# Windows (from Developer Command Prompt)
-cmake -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH=C:/Qt/6.8.0/msvc2022_64
-cmake --build build --config Release
-
-# Linux/macOS
-cmake -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x/gcc_64
-cmake --build build --config Release
+```bat
+build_windows.bat Release
 ```
 
-### Android Build
+### 3) Android Build
 
-```bash
+```bat
 build_android.bat arm64-v8a
 ```
 
-### Deployment (Windows)
+### 4) Windows Deployment
 
-```bash
-# Deploy Qt dependencies
-windeployqt --release build/windows_x64/Release/HywelStarVideoPlayer.exe
-
-# Copy GStreamer DLLs to the same directory
-# Copy GStreamer plugins to lib/gstreamer-1.0/
+```bat
+deploy_windows.bat Release
 ```
 
+### 5) Qt Creator (Alternative)
+
+1. Open Qt Creator
+2. Open `CMakeLists.txt`
+3. Choose your Qt kit
+4. Build and run
 ## Keyboard Shortcuts
 
 | Key | Action |
@@ -149,16 +142,16 @@ HywelStarPlayer/
 ├── build_windows.bat       # Windows build script
 ├── build_android.bat       # Android build script
 ├── cmake/
-│   └── find-modules/       # CMake find modules
+�?  └── find-modules/       # CMake find modules
 ├── src/
-│   ├── main.cpp
-│   ├── MainWindow.cpp/h
-│   ├── core/               # GStreamer engine, recording
-│   ├── ui/                 # UI components
-│   └── utils/              # Logger, stream parser
+�?  ├── main.cpp
+�?  ├── MainWindow.cpp/h
+�?  ├── core/               # GStreamer engine, recording
+�?  ├── ui/                 # UI components
+�?  └── utils/              # Logger, stream parser
 ├── resources/
-│   ├── resources.qrc
-│   └── icons/
+�?  ├── resources.qrc
+�?  └── icons/
 └── android/                # Android build files
 ```
 
@@ -186,3 +179,10 @@ MIT License
 ## Author
 
 hywelstar (hywelstar@126.com)
+
+## Documentation
+
+- Project docs index: docs/README.md
+- Windows build guide: docs/WINDOWS_BUILD.md
+- Build environments: docs/BUILD_ENVIRONMENTS.md
+- Android build guide: docs/ANDROID_BUILD.md

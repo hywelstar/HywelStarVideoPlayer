@@ -24,6 +24,10 @@ namespace {
 constexpr int kMinNetworkLatencyMs = 0;
 constexpr int kMaxNetworkLatencyMs = 5000;
 constexpr int kDefaultNetworkLatencyMs = 0;
+constexpr int kDialogButtonWidth = 112;
+constexpr int kDialogButtonHeight = 44;
+constexpr int kBrowseButtonWidth = 112;
+constexpr int kBrowseButtonHeight = 40;
 }
 
 SettingsDialog::SettingsDialog(QWidget *parent)
@@ -101,6 +105,7 @@ void SettingsDialog::setupUI() {
     recordingPathEdit = new QLineEdit();
     recordingGrid->addWidget(recordingPathEdit, 1, 1);
     QPushButton *browseRecordingBtn = new QPushButton(tr("Browse"));
+    browseRecordingBtn->setFixedSize(kBrowseButtonWidth, kBrowseButtonHeight);
     connect(browseRecordingBtn, &QPushButton::clicked, this, [this]() {
         QString dir = QFileDialog::getExistingDirectory(this, tr("Select Recording Directory"),
                                                         recordingPathEdit->text());
@@ -114,6 +119,7 @@ void SettingsDialog::setupUI() {
     screenshotPathEdit = new QLineEdit();
     recordingGrid->addWidget(screenshotPathEdit, 2, 1);
     QPushButton *browseScreenshotBtn = new QPushButton(tr("Browse"));
+    browseScreenshotBtn->setFixedSize(kBrowseButtonWidth, kBrowseButtonHeight);
     connect(browseScreenshotBtn, &QPushButton::clicked, this, [this]() {
         QString dir = QFileDialog::getExistingDirectory(this, tr("Select Screenshot Directory"),
                                                         screenshotPathEdit->text());
@@ -139,7 +145,7 @@ void SettingsDialog::setupUI() {
             color: white;
             border: none;
             border-radius: 4px;
-            padding: 8px 16px;
+            padding: 0px;
         }
         QPushButton:hover {
             background-color: #6A87B8;
@@ -253,5 +259,11 @@ void SettingsDialog::setAutoPlayNext(bool enabled) {
 void SettingsDialog::setLoopMode(int mode) {
     loopModeCombo->setCurrentIndex(mode);
 }
+
+
+
+
+
+
 
 

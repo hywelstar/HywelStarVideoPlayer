@@ -23,7 +23,9 @@
 namespace {
 constexpr int kMinNetworkLatencyMs = 0;
 constexpr int kMaxNetworkLatencyMs = 5000;
+#ifndef ANDROID
 constexpr GstClockTime kStutterGapThresholdNs = 80 * GST_MSECOND;
+#endif
 
 bool isLikelyAudioOnlyUri(const QString &uri) {
     const QUrl url(uri);
@@ -1066,6 +1068,9 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
+
+
+
 
 
 

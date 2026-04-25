@@ -1,26 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a237e"/>
-      <stop offset="100%" style="stop-color:#0d47a1"/>
+    <linearGradient id="bg" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#f83c00"/>
+      <stop offset="55%" stop-color="#ff8a00"/>
+      <stop offset="100%" stop-color="#ffcf00"/>
     </linearGradient>
-    <linearGradient id="star" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffd54f"/>
-      <stop offset="100%" style="stop-color:#ffb300"/>
+    <linearGradient id="leftWave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffb529"/>
+      <stop offset="100%" stop-color="#ffc738"/>
     </linearGradient>
-    <linearGradient id="play" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#4caf50"/>
-      <stop offset="100%" style="stop-color:#2e7d32"/>
+    <linearGradient id="rightWave" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe23a"/>
+      <stop offset="100%" stop-color="#ffd22a"/>
     </linearGradient>
   </defs>
-  <!-- Background circle -->
-  <circle cx="256" cy="256" r="240" fill="url(#bg)"/>
-  <!-- Outer ring -->
-  <circle cx="256" cy="256" r="220" fill="none" stroke="#42a5f5" stroke-width="8"/>
-  <!-- Star -->
-  <path d="M256 80 l30 90 95 0 -75 55 30 90 -80 -60 -80 60 30 -90 -75 -55 95 0 z" fill="url(#star)"/>
-  <!-- Play button circle -->
-  <circle cx="256" cy="320" r="80" fill="rgba(255,255,255,0.15)"/>
-  <!-- Play triangle -->
-  <path d="M230 280 l70 40 -70 40 z" fill="url(#play)"/>
+
+  <rect x="14" y="14" width="740" height="740" rx="140" fill="url(#bg)"/>
+
+  <path d="M305 231 L545 384 L305 537 Z" fill="#f2f2f2"/>
+  <circle cx="305" cy="384" r="39" fill="#f2f2f2"/>
+
+  <path d="M181 216 C126 277, 112 342, 112 384 C112 426, 126 491, 181 552"
+        fill="none" stroke="url(#leftWave)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M214 271 C176 314, 166 354, 166 384 C166 414, 176 454, 214 497"
+        fill="none" stroke="url(#leftWave)" stroke-width="34" stroke-linecap="round"/>
+
+  <path d="M587 216 C642 277, 656 342, 656 384 C656 426, 642 491, 587 552"
+        fill="none" stroke="url(#rightWave)" stroke-width="34" stroke-linecap="round"/>
+  <path d="M554 271 C592 314, 602 354, 602 384 C602 414, 592 454, 554 497"
+        fill="none" stroke="url(#rightWave)" stroke-width="34" stroke-linecap="round"/>
 </svg>
