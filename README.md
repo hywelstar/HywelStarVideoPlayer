@@ -2,8 +2,7 @@
 
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
 
- <img width="1280" height="750" alt="image" src="https://github.com/user-attachments/assets/23482af2-bc04-4bdd-9f7a-4a14dfef28aa" />
-
+<img width="1280" height="750" alt="image" src="https://github.com/user-attachments/assets/fe442e40-af6e-4d13-9d31-4e4bacb46fae" />
 
 ## Development Progress
 
