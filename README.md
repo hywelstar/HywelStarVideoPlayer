@@ -1,4 +1,4 @@
-# HywelStar  Player
+# HywelStar Player
 
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
 
@@ -8,36 +8,36 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| Windows x64 | �?Done | Qt 6.10 + GStreamer 1.22 |
-| Linux x64 | 🔲 Planned | - |
-| macOS | 🔲 Planned | - |
-| Android arm64-v8a | 🚧 In Progress | GStreamer integration pending |
-| Android x86_64 | 🔲 Planned | For emulator |
+| Windows x64 | Done | Qt 6.10 + GStreamer 1.22 |
+| Linux x64 | Planned | - |
+| macOS | Planned | - |
+| Android arm64-v8a | In Progress | GStreamer integration pending |
+| Android x86_64 | Planned | For emulator |
 
 ### Features
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| RTSP Stream Playback | �?Done | H.264/H.265 |
-| UDP Stream Playback | �?Done | H.264/H.265 |
-| HTTP/HTTPS Playback | �?Done | - |
-| Local File Playback | �?Done | MP4, MKV, AVI, etc. |
-| Video Recording | �?Done | MKV format |
-| Screenshot | �?Done | PNG format |
-| Grid Overlay | �?Done | For positioning |
-| Fullscreen Mode | �?Done | F key / double-click |
-| Volume Control | �?Done | Slider + mute |
-| Settings Persistence | �?Done | Window size, URI, volume |
-| Recording Timer | �?Done | Real-time display |
-| Menu Bar | �?Done | Help > About |
-| Settings Dialog | �?Done | Recording/Screenshot paths |
-| About Dialog | �?Done | App info |
-| Local Playlist | 🔲 Planned | File/folder selection |
-| Playback Speed Control | 🔲 Planned | 0.5x - 2x |
-| Subtitle Support | 🔲 Planned | SRT, ASS |
-| Audio Track Selection | 🔲 Planned | Multi-track support |
-| Hardware Acceleration | 🚧 Partial | D3D11 on Windows |
-| Multi-language UI | 🔲 Planned | i18n support |
+| RTSP Stream Playback | Done | H.264/H.265 |
+| UDP Stream Playback | Done | H.264/H.265 |
+| HTTP/HTTPS Playback | Done | - |
+| Local File Playback | Done | MP4, MKV, AVI, etc. |
+| Video Recording | Done | MKV format |
+| Screenshot | Done | PNG format |
+| Grid Overlay | Done | For positioning |
+| Fullscreen Mode | Done | F key / double-click |
+| Volume Control | Done | Slider + mute |
+| Settings Persistence | Done | Window size, URI, volume |
+| Recording Timer | Done | Real-time display |
+| Menu Bar | Done | Top menu |
+| Settings Dialog | Done | Recording/Screenshot paths |
+| About Dialog | Done | App info |
+| Local Playlist | Planned | File/folder selection |
+| Playback Speed Control | Planned | 0.5x - 2x |
+| Subtitle Support | Planned | SRT, ASS |
+| Audio Track Selection | Planned | Multi-track support |
+| Hardware Acceleration | Partial | D3D11 on Windows |
+| Multi-language UI | Planned | i18n support |
 
 ### Known Issues
 
@@ -56,7 +56,6 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 2. **GStreamer 1.20+**
    - Download from [GStreamer Downloads](https://gstreamer.freedesktop.org/download/)
    - Install both **Runtime** and **Development** packages (MSVC 64-bit)
-   - The installer will set environment variables automatically
 
 3. **Visual Studio 2022** (or Build Tools)
    - Required for MSVC compiler
@@ -116,6 +115,7 @@ deploy_windows.bat Release
 2. Open `CMakeLists.txt`
 3. Choose your Qt kit
 4. Build and run
+
 ## Keyboard Shortcuts
 
 | Key | Action |
@@ -136,23 +136,26 @@ deploy_windows.bat Release
 
 ## Project Structure
 
-```
+```text
 HywelStarPlayer/
-├── CMakeLists.txt          # Build configuration
-├── build_windows.bat       # Windows build script
-├── build_android.bat       # Android build script
-├── cmake/
-�?  └── find-modules/       # CMake find modules
-├── src/
-�?  ├── main.cpp
-�?  ├── MainWindow.cpp/h
-�?  ├── core/               # GStreamer engine, recording
-�?  ├── ui/                 # UI components
-�?  └── utils/              # Logger, stream parser
-├── resources/
-�?  ├── resources.qrc
-�?  └── icons/
-└── android/                # Android build files
+|-- CMakeLists.txt          # Build configuration
+|-- build_windows.bat       # Windows build script
+|-- build_android.bat       # Android build script
+|-- deploy_windows.bat      # Windows deploy script
+|-- package_portable.bat    # Portable package script
+|-- env.local.example.bat   # Local env template
+|-- cmake/
+|   `-- find-modules/       # CMake find modules
+|-- src/
+|   |-- main.cpp
+|   |-- MainWindow.cpp/h
+|   |-- core/               # GStreamer engine, recording
+|   |-- ui/                 # UI components
+|   `-- utils/              # Logger, stream parser
+|-- resources/
+|   |-- resources.qrc
+|   `-- icons/
+`-- docs/
 ```
 
 ## Technology Stack
@@ -186,4 +189,3 @@ hywelstar (hywelstar@163.com)
 - Windows build guide: docs/WINDOWS_BUILD.md
 - Build environments: docs/BUILD_ENVIRONMENTS.md
 - Android build guide: docs/ANDROID_BUILD.md
-
