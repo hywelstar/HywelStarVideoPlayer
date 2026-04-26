@@ -167,7 +167,7 @@ HywelStarPlayer/
 
 ## Changelog
 
-### v1.0.0 (In Development)
+### v1.0.0 (Released 2026-04-26)
 - Basic stream playback (RTSP, UDP, HTTP)
 - Video recording and screenshot
 - Fullscreen mode with keyboard/mouse support
@@ -189,3 +189,4 @@ hywelstar (hywelstar@163.com)
 - Windows build guide: docs/WINDOWS_BUILD.md
 - Build environments: docs/BUILD_ENVIRONMENTS.md
 - Android build guide: docs/ANDROID_BUILD.md
+
