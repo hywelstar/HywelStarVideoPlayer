@@ -8,7 +8,7 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| Windows x64 | �?Done | Qt 6.10 + GStreamer 1.22 |
+| Windows x64 | �?Done | Qt 6.10 + GStreamer 1.22 |
 | Linux x64 | 🔲 Planned | - |
 | macOS | 🔲 Planned | - |
 | Android arm64-v8a | 🚧 In Progress | GStreamer integration pending |
@@ -18,20 +18,20 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| RTSP Stream Playback | �?Done | H.264/H.265 |
-| UDP Stream Playback | �?Done | H.264/H.265 |
-| HTTP/HTTPS Playback | �?Done | - |
-| Local File Playback | �?Done | MP4, MKV, AVI, etc. |
-| Video Recording | �?Done | MKV format |
-| Screenshot | �?Done | PNG format |
-| Grid Overlay | �?Done | For positioning |
-| Fullscreen Mode | �?Done | F key / double-click |
-| Volume Control | �?Done | Slider + mute |
-| Settings Persistence | �?Done | Window size, URI, volume |
-| Recording Timer | �?Done | Real-time display |
-| Menu Bar | �?Done | Help > About |
-| Settings Dialog | �?Done | Recording/Screenshot paths |
-| About Dialog | �?Done | App info |
+| RTSP Stream Playback | �?Done | H.264/H.265 |
+| UDP Stream Playback | �?Done | H.264/H.265 |
+| HTTP/HTTPS Playback | �?Done | - |
+| Local File Playback | �?Done | MP4, MKV, AVI, etc. |
+| Video Recording | �?Done | MKV format |
+| Screenshot | �?Done | PNG format |
+| Grid Overlay | �?Done | For positioning |
+| Fullscreen Mode | �?Done | F key / double-click |
+| Volume Control | �?Done | Slider + mute |
+| Settings Persistence | �?Done | Window size, URI, volume |
+| Recording Timer | �?Done | Real-time display |
+| Menu Bar | �?Done | Help > About |
+| Settings Dialog | �?Done | Recording/Screenshot paths |
+| About Dialog | �?Done | App info |
 | Local Playlist | 🔲 Planned | File/folder selection |
 | Playback Speed Control | 🔲 Planned | 0.5x - 2x |
 | Subtitle Support | 🔲 Planned | SRT, ASS |
@@ -142,16 +142,16 @@ HywelStarPlayer/
 ├── build_windows.bat       # Windows build script
 ├── build_android.bat       # Android build script
 ├── cmake/
-�?  └── find-modules/       # CMake find modules
+�?  └── find-modules/       # CMake find modules
 ├── src/
-�?  ├── main.cpp
-�?  ├── MainWindow.cpp/h
-�?  ├── core/               # GStreamer engine, recording
-�?  ├── ui/                 # UI components
-�?  └── utils/              # Logger, stream parser
+�?  ├── main.cpp
+�?  ├── MainWindow.cpp/h
+�?  ├── core/               # GStreamer engine, recording
+�?  ├── ui/                 # UI components
+�?  └── utils/              # Logger, stream parser
 ├── resources/
-�?  ├── resources.qrc
-�?  └── icons/
+�?  ├── resources.qrc
+�?  └── icons/
 └── android/                # Android build files
 ```
 
@@ -178,7 +178,7 @@ MIT License
 
 ## Author
 
-hywelstar (hywelstar@126.com)
+hywelstar (hywelstar@163.com)
 
 ## Documentation
 
@@ -186,3 +186,4 @@ hywelstar (hywelstar@126.com)
 - Windows build guide: docs/WINDOWS_BUILD.md
 - Build environments: docs/BUILD_ENVIRONMENTS.md
 - Android build guide: docs/ANDROID_BUILD.md
+

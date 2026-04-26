@@ -2,7 +2,7 @@
  * @file AboutDialog.cpp
  * @brief About dialog implementation
  * @author hywelstar
- * @email hywelstar@126.com
+ * @email hywelstar@163.com
  * @date 2026
  * @copyright MIT License
  */
@@ -49,7 +49,7 @@ AboutDialog::AboutDialog(QWidget *parent)
     descLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(descLabel);
 
-    QLabel *authorLabel = new QLabel(tr("Author: hywelstar\nEmail: hywelstar@126.com"));
+    QLabel *authorLabel = new QLabel(tr("Author: hywelstar\nEmail: hywelstar@163.com"));
     authorLabel->setStyleSheet("font-size: 12px; color: #888;");
     authorLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(authorLabel);
@@ -90,6 +90,7 @@ AboutDialog::AboutDialog(QWidget *parent)
     buttonLayout->addStretch();
     mainLayout->addLayout(buttonLayout);
 }
+
 
 
 
