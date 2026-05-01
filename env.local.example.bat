@@ -1,5 +1,5 @@
 @echo off
-REM -----------------------------------------------------------------------------
+ -----------------------------------------------------------------------------
 REM Local build environment config (copy to env.local.bat and edit values)
 REM This file is machine-specific and should NOT be committed.
 REM -----------------------------------------------------------------------------
