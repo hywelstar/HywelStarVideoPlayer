@@ -24,18 +24,22 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 | UDP Stream Playback | Done | H.264/H.265 |
 | HTTP/HTTPS Playback | Done | - |
 | Local File Playback | Done | MP4, MKV, AVI, etc. |
+| Stream/Local Mode Switch | Done | Separate stream URL and local playback workflows |
+| Local Playlist | Done | File/folder selection, persisted file list |
+| Local Playback Modes | Done | Play Once, Loop One, Loop All |
+| Playback Progress Overlay | Done | In-video progress bar with seek, auto-hide |
+| Playback Speed Control | Done | 0.5x - 2x |
+| Fit/Stretch Display | Done | Aspect fit or stretch toggle |
 | Video Recording | Done | MKV format |
 | Screenshot | Done | PNG format |
 | Grid Overlay | Done | For positioning |
 | Fullscreen Mode | Done | F key / double-click |
 | Volume Control | Done | Slider + mute |
-| Settings Persistence | Done | Window size, URI, volume |
+| Settings Persistence | Done | Window size, stream URI, volume, mode, loop settings |
 | Recording Timer | Done | Real-time display |
 | Menu Bar | Done | Top menu |
 | Settings Dialog | Done | Recording/Screenshot paths |
 | About Dialog | Done | App info |
-| Local Playlist | Planned | File/folder selection |
-| Playback Speed Control | Planned | 0.5x - 2x |
 | Subtitle Support | Planned | SRT, ASS |
 | Audio Track Selection | Planned | Multi-track support |
 | Hardware Acceleration | Partial | D3D11 on Windows |
@@ -99,6 +103,14 @@ Build scripts auto-load `env.local.bat` if it exists.
 build_windows.bat Release
 ```
 
+Show script help:
+
+```bat
+build_windows.bat --help
+```
+
+If the output executable is still running, the script attempts to close `HywelStarVideoPlayer.exe` and retry the build once.
+
 ### 3) Android Build
 
 ```bat
@@ -134,6 +146,9 @@ deploy_windows.bat Release
 
 | Action | Function |
 |--------|----------|
+| Move over video | Show progress overlay |
+| Click video | Play/Pause |
+| Drag progress bar | Seek local/media playback |
 | Double-click | Toggle fullscreen |
 
 ## Project Structure
@@ -153,6 +168,7 @@ HywelStarPlayer/
 |   |-- MainWindow.cpp/h
 |   |-- core/               # GStreamer engine, recording
 |   |-- ui/                 # UI components
+|   |   `-- LocalFileListWidget.cpp/h
 |   `-- utils/              # Logger, stream parser
 |-- resources/
 |   |-- resources.qrc
@@ -168,6 +184,15 @@ HywelStarPlayer/
 - **Build System**: CMake 3.16+
 
 ## Changelog
+
+### Unreleased
+- Added Stream/Local mode switching in the top bar.
+- Added local file list with file/folder import and persisted playlist.
+- Added local playback modes: Play Once, Loop One, Loop All.
+- Added in-video progress overlay with seek and auto-hide behavior.
+- Added playback speed and fit/stretch display controls.
+- Improved fullscreen and video overlay refresh behavior.
+- Updated Windows build script with `--help` and automatic retry when the executable is in use.
 
 ### v1.0.0 (Released 2026-04-26)
 - Basic stream playback (RTSP, UDP, HTTP)
@@ -191,4 +216,3 @@ hywelstar (hywelstar@163.com)
 - Windows build guide: docs/WINDOWS_BUILD.md
 - Build environments: docs/BUILD_ENVIRONMENTS.md
 - Android build guide: docs/ANDROID_BUILD.md
-
