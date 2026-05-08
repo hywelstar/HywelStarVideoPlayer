@@ -23,7 +23,7 @@ ConfigManager::ConfigManager() {
     configFilepath = configDir + "/config.json";
 
     // Initialize default config
-    configData["version"] = "1.0";
+    configData["version"] = "1.1";
     configData["general"] = QJsonObject{
         {"language", "zh_CN"},
         {"theme", "dark"},

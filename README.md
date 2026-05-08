@@ -185,7 +185,7 @@ HywelStarPlayer/
 
 ## Changelog
 
-### Unreleased
+### v1.1.0 (Released 2026-05-08)
 - Added Stream/Local mode switching in the top bar.
 - Added local file list with file/folder import and persisted playlist.
 - Added local playback modes: Play Once, Loop One, Loop All.
