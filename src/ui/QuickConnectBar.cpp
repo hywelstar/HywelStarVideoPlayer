@@ -8,6 +8,7 @@
  */
 
 #include "QuickConnectBar.h"
+#include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QSettings>
 #include <QIcon>
@@ -28,6 +29,22 @@ void QuickConnectBar::setupUI() {
     // App title label
     titleLabel = new QLabel("HywelStar Player");
     layout->addWidget(titleLabel);
+
+    modeGroup = new QButtonGroup(this);
+    modeGroup->setExclusive(true);
+
+    streamModeButton = new QPushButton(tr("Stream"));
+    streamModeButton->setCheckable(true);
+    streamModeButton->setChecked(true);
+    streamModeButton->setToolTip(tr("Play stream URLs"));
+    modeGroup->addButton(streamModeButton, 0);
+    layout->addWidget(streamModeButton);
+
+    localModeButton = new QPushButton(tr("Local"));
+    localModeButton->setCheckable(true);
+    localModeButton->setToolTip(tr("Show local media files"));
+    modeGroup->addButton(localModeButton, 1);
+    layout->addWidget(localModeButton);
 
     // URI input
     uriInput = new QLineEdit();
@@ -83,6 +100,28 @@ void QuickConnectBar::setupUI() {
         }
     )");
 
+    const char *modeButtonStyle = R"(
+        QPushButton {
+            background-color: #FFFFFF;
+            color: #2F343B;
+            border: 1px solid #D7DCE3;
+            border-radius: 6px;
+            padding: 8px 12px;
+            min-height: 36px;
+            min-width: 68px;
+        }
+        QPushButton:checked {
+            background-color: #DDE7F8;
+            border-color: #7A97CC;
+            font-weight: 700;
+        }
+        QPushButton:hover {
+            background-color: #F0F2F5;
+        }
+    )";
+    streamModeButton->setStyleSheet(QString::fromLatin1(modeButtonStyle));
+    localModeButton->setStyleSheet(QString::fromLatin1(modeButtonStyle));
+
     setStyleSheet("QWidget { background-color: #F5F6F8; }");
 }
 
@@ -96,9 +135,17 @@ void QuickConnectBar::connectSignals() {
     });
 
     connect(settingsButton, &QPushButton::clicked, this, &QuickConnectBar::settingsRequested);
+    connect(modeGroup, &QButtonGroup::idClicked, this, [this](int id) {
+        const bool localMode = id == 1;
+        setLocalMode(localMode);
+        emit localModeChanged(localMode);
+    });
 }
 
 QString QuickConnectBar::getStreamUri() const {
+    if (isLocalMode()) {
+        return lastStreamUri;
+    }
     return uriInput->text();
 }
 
@@ -118,10 +165,48 @@ void QuickConnectBar::loadHistory() {
     QSettings settings("HywelStar", "HywelStarVideoPlayer");
     QString lastUri = settings.value("lastUri", "").toString();
     if (!lastUri.isEmpty()) {
-        uriInput->setText(lastUri);
+        lastStreamUri = lastUri;
+        uriInput->setText(lastStreamUri);
     }
 }
 
 void QuickConnectBar::setUri(const QString &uri) {
+    if (uri.startsWith("file://", Qt::CaseInsensitive)) {
+        if (isLocalMode()) {
+            uriInput->clear();
+        }
+        return;
+    }
+
+    lastStreamUri = uri;
     uriInput->setText(uri);
+}
+
+void QuickConnectBar::setLocalMode(bool localMode) {
+    if (localMode) {
+        const QString currentText = uriInput->text().trimmed();
+        if (!currentText.isEmpty() && !currentText.startsWith("file://", Qt::CaseInsensitive)) {
+            lastStreamUri = currentText;
+        }
+    }
+
+    localModeButton->setChecked(localMode);
+    streamModeButton->setChecked(!localMode);
+
+    if (localMode) {
+        uriInput->clear();
+        uriInput->setReadOnly(true);
+        uriInput->setPlaceholderText(tr("Local mode: select files from the local file list"));
+    } else {
+        uriInput->setReadOnly(false);
+        uriInput->setPlaceholderText(tr("Enter stream URL (rtsp://, udp://, http://...) and press Enter"));
+        if (uriInput->text().trimmed().isEmpty() && !lastStreamUri.isEmpty()) {
+            uriInput->setText(lastStreamUri);
+        }
+    }
+    uriInput->setVisible(true);
+}
+
+bool QuickConnectBar::isLocalMode() const {
+    return localModeButton->isChecked();
 }

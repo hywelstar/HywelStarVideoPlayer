@@ -115,6 +115,7 @@ set(SOURCES
     src/ui/ControlBar.cpp
     src/ui/StatusBar.cpp
     src/ui/QuickConnectBar.cpp
+    src/ui/LocalFileListWidget.cpp
     src/ui/SettingsDialog.cpp
     src/ui/AboutDialog.cpp
     src/utils/Logger.cpp
@@ -130,6 +131,7 @@ set(HEADERS
     src/ui/ControlBar.h
     src/ui/StatusBar.h
     src/ui/QuickConnectBar.h
+    src/ui/LocalFileListWidget.h
     src/ui/SettingsDialog.h
     src/ui/AboutDialog.h
     src/utils/Logger.h

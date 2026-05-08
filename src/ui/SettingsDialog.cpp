@@ -60,7 +60,7 @@ void SettingsDialog::setupUI() {
 
     playbackGrid->addWidget(new QLabel(tr("Loop Mode:")), 0, 0);
     loopModeCombo = new QComboBox();
-    loopModeCombo->addItem(tr("No Loop"), 0);
+    loopModeCombo->addItem(tr("Play Once"), 0);
     loopModeCombo->addItem(tr("Loop One"), 1);
     loopModeCombo->addItem(tr("Loop All"), 2);
     playbackGrid->addWidget(loopModeCombo, 0, 1);

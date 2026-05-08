@@ -15,10 +15,18 @@
 #include <QSlider>
 #include <QLabel>
 
+class QComboBox;
+
 enum class PlaybackState {
     Stopped,
     Playing,
     Paused
+};
+
+enum class PlaybackEndMode {
+    Stop,
+    RepeatOne,
+    RepeatAll
 };
 
 class ControlBar : public QWidget {
@@ -34,6 +42,10 @@ public:
     void setVolume(int volume);
     int volume() const;
     void setGridActive(bool active);
+    void setStretchActive(bool active);
+    void setPlaybackRate(double rate);
+    void setPlaybackEndMode(PlaybackEndMode mode);
+    PlaybackEndMode playbackEndMode() const;
 
 signals:
     void playPauseRequested();
@@ -43,6 +55,9 @@ signals:
     void fullscreenRequested();
     void gridToggleRequested();
     void volumeChanged(int volume);
+    void stretchToggleRequested(bool stretch);
+    void playbackRateChanged(double rate);
+    void playbackEndModeChanged(PlaybackEndMode mode);
 
 private:
     void setupUI();
@@ -53,7 +68,10 @@ private:
     QPushButton *recordButton;
     QPushButton *screenshotButton;
     QPushButton *gridButton;
+    QPushButton *stretchButton;
     QPushButton *fullscreenButton;
+    QComboBox *endModeComboBox;
+    QComboBox *speedComboBox;
     QSlider *volumeSlider;
     QLabel *recordingTimeLabel;
     QLabel *volumeLabel;

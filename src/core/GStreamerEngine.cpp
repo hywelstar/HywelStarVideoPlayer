@@ -102,6 +102,117 @@ void GStreamerEngine::setWindowHandle(WId windowId) {
 #endif
 }
 
+void GStreamerEngine::refreshVideo() {
+#ifndef ANDROID
+    if (videoSink && GST_IS_VIDEO_OVERLAY(videoSink)) {
+        gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
+        gst_video_overlay_expose(GST_VIDEO_OVERLAY(videoSink));
+    }
+#endif
+}
+
+void GStreamerEngine::seek(qint64 positionMs) {
+#ifndef ANDROID
+    if (!pipeline || positionMs < 0) {
+        return;
+    }
+
+    const gint64 positionNs = positionMs * GST_MSECOND;
+    if (!gst_element_seek(pipeline,
+                          currentPlaybackRate,
+                          GST_FORMAT_TIME,
+                          static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
+                          GST_SEEK_TYPE_SET,
+                          positionNs,
+                          GST_SEEK_TYPE_NONE,
+                          GST_CLOCK_TIME_NONE)) {
+        Logger::instance().warning(QString("GStreamerEngine: Seek failed at %1 ms").arg(positionMs));
+    }
+#else
+    Q_UNUSED(positionMs)
+#endif
+}
+
+qint64 GStreamerEngine::positionMs() const {
+#ifndef ANDROID
+    if (!pipeline) {
+        return -1;
+    }
+
+    gint64 position = GST_CLOCK_TIME_NONE;
+    if (!gst_element_query_position(pipeline, GST_FORMAT_TIME, &position) || position == GST_CLOCK_TIME_NONE) {
+        return -1;
+    }
+    return position / GST_MSECOND;
+#else
+    return -1;
+#endif
+}
+
+qint64 GStreamerEngine::durationMs() const {
+#ifndef ANDROID
+    if (!pipeline) {
+        return -1;
+    }
+
+    gint64 duration = GST_CLOCK_TIME_NONE;
+    if (!gst_element_query_duration(pipeline, GST_FORMAT_TIME, &duration) || duration == GST_CLOCK_TIME_NONE) {
+        return -1;
+    }
+    return duration / GST_MSECOND;
+#else
+    return -1;
+#endif
+}
+
+void GStreamerEngine::setPlaybackRate(double rate) {
+    if (rate <= 0.0) {
+        return;
+    }
+
+    currentPlaybackRate = rate;
+#ifndef ANDROID
+    if (!pipeline) {
+        return;
+    }
+
+    const qint64 currentPosition = qMax<qint64>(0, positionMs());
+    const gint64 positionNs = currentPosition * GST_MSECOND;
+    if (!gst_element_seek(pipeline,
+                          currentPlaybackRate,
+                          GST_FORMAT_TIME,
+                          static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
+                          GST_SEEK_TYPE_SET,
+                          positionNs,
+                          GST_SEEK_TYPE_NONE,
+                          GST_CLOCK_TIME_NONE)) {
+        Logger::instance().warning(QString("GStreamerEngine: Playback rate change failed: %1x").arg(currentPlaybackRate));
+    }
+#endif
+}
+
+double GStreamerEngine::playbackRate() const {
+    return currentPlaybackRate;
+}
+
+void GStreamerEngine::setStretchVideo(bool stretch) {
+    stretchVideoEnabled = stretch;
+#ifndef ANDROID
+    if (!videoSink) {
+        return;
+    }
+
+    GObjectClass *klass = G_OBJECT_GET_CLASS(videoSink);
+    if (klass && g_object_class_find_property(klass, "force-aspect-ratio")) {
+        g_object_set(G_OBJECT(videoSink), "force-aspect-ratio", stretch ? FALSE : TRUE, nullptr);
+    }
+#endif
+}
+
+bool GStreamerEngine::stretchVideo() const {
+    return stretchVideoEnabled;
+}
+
 void GStreamerEngine::play(const QString &uri) {
     const bool hasNewUri = !uri.isEmpty();
     const bool uriChanged = hasNewUri && (uri != currentUri);
@@ -144,6 +255,83 @@ void GStreamerEngine::play(const QString &uri) {
     }
 #else
     // Android stub: just emit state change
+    currentState = PlayerState::Playing;
+    emit stateChanged(currentState);
+#endif
+}
+
+void GStreamerEngine::restart(const QString &uri) {
+    if (uri.isEmpty()) {
+        Logger::instance().error("GStreamerEngine: Cannot restart playback without URI");
+        emit errorOccurred("No URI specified");
+        return;
+    }
+
+    Logger::instance().info(QString("GStreamerEngine: Restarting URI: %1").arg(uri));
+
+#ifndef ANDROID
+    if (pipeline) {
+        cleanupPipeline();
+    }
+
+    currentUri = uri;
+    setupPipeline(currentUri);
+
+    if (pipeline) {
+        gst_element_set_state(pipeline, GST_STATE_PLAYING);
+        currentState = PlayerState::Playing;
+        Logger::instance().info("GStreamerEngine: Playback restarted");
+        emit stateChanged(currentState);
+    }
+#else
+    currentUri = uri;
+    currentState = PlayerState::Playing;
+    emit stateChanged(currentState);
+#endif
+}
+
+void GStreamerEngine::resume() {
+#ifndef ANDROID
+    if (!pipeline) {
+        if (!currentUri.isEmpty()) {
+            play(currentUri);
+        }
+        return;
+    }
+
+    const qint64 resumePositionMs = positionMs();
+    const qint64 resumeDurationMs = durationMs();
+    const GstStateChangeReturn stateResult = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    if (stateResult == GST_STATE_CHANGE_FAILURE) {
+        Logger::instance().error("GStreamerEngine: Resume failed while setting pipeline to PLAYING");
+        currentState = PlayerState::Error;
+        emit errorOccurred("Failed to resume playback");
+        emit stateChanged(currentState);
+        return;
+    }
+
+    if (resumePositionMs >= 0 && resumeDurationMs > 0) {
+        const gint64 positionNs = resumePositionMs * GST_MSECOND;
+        if (!gst_element_seek(pipeline,
+                              currentPlaybackRate,
+                              GST_FORMAT_TIME,
+                              static_cast<GstSeekFlags>(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_KEY_UNIT),
+                              GST_SEEK_TYPE_SET,
+                              positionNs,
+                              GST_SEEK_TYPE_NONE,
+                              GST_CLOCK_TIME_NONE)) {
+            Logger::instance().warning(QString("GStreamerEngine: Resume seek refresh failed at %1 ms").arg(resumePositionMs));
+        }
+    }
+
+    currentState = PlayerState::Playing;
+    Logger::instance().info(QString("GStreamerEngine: Playback resumed (stateResult=%1, position=%2 ms, duration=%3 ms)")
+                            .arg(static_cast<int>(stateResult))
+                            .arg(resumePositionMs)
+                            .arg(resumeDurationMs));
+    emit stateChanged(currentState);
+    refreshVideo();
+#else
     currentState = PlayerState::Playing;
     emit stateChanged(currentState);
 #endif
@@ -757,6 +945,7 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     }
     case GST_MESSAGE_EOS:
         Logger::instance().info("GStreamerEngine: End of stream reached");
+        emit endOfStream();
         currentState = PlayerState::Stopped;
         emit stateChanged(currentState);
         break;
@@ -949,6 +1138,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
                  "sync", FALSE,
                  "qos", FALSE,
                  nullptr);
+    setStretchVideo(stretchVideoEnabled);
 
     gst_bin_add_many(GST_BIN(videoSinkBin), tee, queue, videoSink, nullptr);
     if (!gst_element_link(tee, queue) ||

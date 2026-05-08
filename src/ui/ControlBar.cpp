@@ -9,6 +9,7 @@
 
 #include "ControlBar.h"
 #include <QHBoxLayout>
+#include <QComboBox>
 #include <QStyle>
 #include <QIcon>
 #include <QSizePolicy>
@@ -118,6 +119,33 @@ void ControlBar::setupUI() {
 
     layout->addStretch();
 
+    // Stretch button
+    stretchButton = new QPushButton(tr("Fit"));
+    stretchButton->setCheckable(true);
+    stretchButton->setMinimumWidth(48);
+    stretchButton->setToolTip(tr("Fit / Stretch video"));
+    layout->addWidget(stretchButton);
+
+    endModeComboBox = new QComboBox();
+    endModeComboBox->addItem(tr("Play Once"), static_cast<int>(PlaybackEndMode::Stop));
+    endModeComboBox->addItem(tr("Loop One"), static_cast<int>(PlaybackEndMode::RepeatOne));
+    endModeComboBox->addItem(tr("Loop All"), static_cast<int>(PlaybackEndMode::RepeatAll));
+    endModeComboBox->setToolTip(tr("Local file end behavior"));
+    endModeComboBox->setMinimumWidth(118);
+    layout->addWidget(endModeComboBox);
+
+    speedComboBox = new QComboBox();
+    speedComboBox->addItem("0.5x", 0.5);
+    speedComboBox->addItem("0.75x", 0.75);
+    speedComboBox->addItem("1x", 1.0);
+    speedComboBox->addItem("1.25x", 1.25);
+    speedComboBox->addItem("1.5x", 1.5);
+    speedComboBox->addItem("2x", 2.0);
+    speedComboBox->setCurrentIndex(2);
+    speedComboBox->setToolTip(tr("Playback speed"));
+    speedComboBox->setMinimumWidth(76);
+    layout->addWidget(speedComboBox);
+
     // Volume icon
     volumeLabel = new QLabel();
     volumeLabel->setPixmap(QIcon(":/icons/volume").pixmap(20, 20));
@@ -171,7 +199,17 @@ void ControlBar::connectSignals() {
     });
     connect(screenshotButton, &QPushButton::clicked, this, &ControlBar::screenshotRequested);
     connect(gridButton, &QPushButton::clicked, this, &ControlBar::gridToggleRequested);
+    connect(stretchButton, &QPushButton::toggled, this, [this](bool checked) {
+        stretchButton->setText(checked ? tr("Stretch") : tr("Fit"));
+        emit stretchToggleRequested(checked);
+    });
     connect(fullscreenButton, &QPushButton::clicked, this, &ControlBar::fullscreenRequested);
+    connect(endModeComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        emit playbackEndModeChanged(static_cast<PlaybackEndMode>(endModeComboBox->itemData(index).toInt()));
+    });
+    connect(speedComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
+        emit playbackRateChanged(speedComboBox->itemData(index).toDouble());
+    });
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         if (value == 0) {
             volumeLabel->setPixmap(QIcon(":/icons/volume_mute").pixmap(20, 20));
@@ -245,6 +283,34 @@ int ControlBar::volume() const {
 
 void ControlBar::setGridActive(bool active) {
     gridButton->setChecked(active);
+}
+
+void ControlBar::setStretchActive(bool active) {
+    stretchButton->setChecked(active);
+    stretchButton->setText(active ? tr("Stretch") : tr("Fit"));
+}
+
+void ControlBar::setPlaybackRate(double rate) {
+    for (int i = 0; i < speedComboBox->count(); ++i) {
+        if (qFuzzyCompare(speedComboBox->itemData(i).toDouble(), rate)) {
+            speedComboBox->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+void ControlBar::setPlaybackEndMode(PlaybackEndMode mode) {
+    const int value = static_cast<int>(mode);
+    for (int i = 0; i < endModeComboBox->count(); ++i) {
+        if (endModeComboBox->itemData(i).toInt() == value) {
+            endModeComboBox->setCurrentIndex(i);
+            return;
+        }
+    }
+}
+
+PlaybackEndMode ControlBar::playbackEndMode() const {
+    return static_cast<PlaybackEndMode>(endModeComboBox->currentData().toInt());
 }
 
 

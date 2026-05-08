@@ -12,20 +12,26 @@
 #include "ui/ControlBar.h"
 #include "ui/StatusBar.h"
 #include "ui/QuickConnectBar.h"
+#include "ui/LocalFileListWidget.h"
 #include "ui/SettingsDialog.h"
 #include "ui/AboutDialog.h"
 #include "core/GStreamerEngine.h"
 #include "core/RecordingManager.h"
 #include "core/ConfigManager.h"
 #include "utils/Logger.h"
+#include <QApplication>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QCloseEvent>
 #include <QImage>
+#include <QLabel>
+#include <QMouseEvent>
 #include <QSettings>
 #include <QMenuBar>
 #include <QAction>
+#include <QSlider>
+#include <QSplitter>
 #include <QUrl>
 #include <QtGlobal>
 
@@ -33,6 +39,10 @@ namespace {
 constexpr int kMinNetworkLatencyMs = 0;
 constexpr int kMaxNetworkLatencyMs = 5000;
 constexpr int kDefaultNetworkLatencyMs = 0;
+
+bool isLocalFileUri(const QString &uri) {
+    return uri.startsWith("file://", Qt::CaseInsensitive);
+}
 
 bool isValidStreamUri(const QString &uri) {
     if (uri.isEmpty()) {
@@ -56,10 +66,14 @@ MainWindow::MainWindow(QWidget *parent)
     , controlBar(std::make_unique<ControlBar>())
     , statusBar(std::make_unique<StatusBar>())
     , quickConnectBar(std::make_unique<QuickConnectBar>())
+    , localFileList(std::make_unique<LocalFileListWidget>())
     , gstreamerEngine(std::make_unique<GStreamerEngine>())
     , recordingManager(std::make_unique<RecordingManager>())
     , configManager(std::make_unique<ConfigManager>())
     , recordingTimer(new QTimer(this))
+    , playbackTimer(new QTimer(this))
+    , overlayHideTimer(new QTimer(this))
+    , clickTimer(new QTimer(this))
 {
     Logger::instance().info("MainWindow: Initializing main window...");
     setWindowTitle("HywelStar Video Player");
@@ -73,12 +87,20 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Setup recording timer
     connect(recordingTimer, &QTimer::timeout, this, &MainWindow::updateRecordingTime);
+    connect(playbackTimer, &QTimer::timeout, this, &MainWindow::updatePlaybackPosition);
+    playbackTimer->start(500);
+    overlayHideTimer->setSingleShot(true);
+    connect(overlayHideTimer, &QTimer::timeout, this, &MainWindow::hidePlaybackOverlay);
+    clickTimer->setSingleShot(true);
+    connect(clickTimer, &QTimer::timeout, this, &MainWindow::onPlayPause);
+    qApp->installEventFilter(this);
 
     Logger::instance().info("MainWindow: Initialization complete");
 }
 
 MainWindow::~MainWindow() {
     Logger::instance().info("MainWindow: Shutting down...");
+    qApp->removeEventFilter(this);
     saveSettings();
 }
 
@@ -128,8 +150,20 @@ void MainWindow::setupUI() {
     // Add quick connect bar
     mainLayout->addWidget(quickConnectBar.get());
 
-    // Add video display widget
-    mainLayout->addWidget(videoWidget.get(), 1);
+    contentSplitter = new QSplitter(Qt::Horizontal);
+    contentSplitter->setChildrenCollapsible(false);
+    contentSplitter->addWidget(localFileList.get());
+    contentSplitter->addWidget(videoWidget.get());
+    contentSplitter->setStretchFactor(0, 0);
+    contentSplitter->setStretchFactor(1, 1);
+    contentSplitter->setSizes({260, 1020});
+    contentSplitter->setStyleSheet(R"(
+        QSplitter::handle {
+            background-color: #D7DCE3;
+            width: 1px;
+        }
+    )");
+    mainLayout->addWidget(contentSplitter, 1);
 
     // Add control bar
     mainLayout->addWidget(controlBar.get());
@@ -138,6 +172,7 @@ void MainWindow::setupUI() {
     setStatusBar(statusBar.get());
 
     setCentralWidget(centralWidget);
+    setupPlaybackOverlay(centralWidget);
 
     // Set window handle for GStreamer
     gstreamerEngine->setWindowHandle((WId)videoWidget->winId());
@@ -149,6 +184,12 @@ void MainWindow::connectSignals() {
             this, &MainWindow::onPlayUri);
     connect(quickConnectBar.get(), &QuickConnectBar::settingsRequested,
             this, &MainWindow::onShowSettings);
+    connect(quickConnectBar.get(), &QuickConnectBar::localModeChanged,
+            this, &MainWindow::setLocalFilePanelVisible);
+
+    // Local file list signals
+    connect(localFileList.get(), &LocalFileListWidget::playFileRequested,
+            this, &MainWindow::onPlayLocalFile);
 
     // Control bar signals
     connect(controlBar.get(), &ControlBar::playPauseRequested,
@@ -165,12 +206,20 @@ void MainWindow::connectSignals() {
             this, &MainWindow::onToggleGrid);
     connect(controlBar.get(), &ControlBar::volumeChanged,
             this, &MainWindow::onVolumeChanged);
+    connect(controlBar.get(), &ControlBar::stretchToggleRequested,
+            this, &MainWindow::onStretchToggleRequested);
+    connect(controlBar.get(), &ControlBar::playbackRateChanged,
+            this, &MainWindow::onPlaybackRateChanged);
+    connect(controlBar.get(), &ControlBar::playbackEndModeChanged,
+            this, &MainWindow::onPlaybackEndModeChanged);
 
     // Video display widget signals
     connect(videoWidget.get(), &VideoDisplayWidget::fullScreenRequested,
             this, &MainWindow::onToggleFullScreen);
     connect(videoWidget.get(), &VideoDisplayWidget::gridToggleRequested,
             this, &MainWindow::onToggleGrid);
+    connect(videoWidget.get(), &VideoDisplayWidget::seekRequested,
+            this, &MainWindow::onSeekRequested);
 
     // GStreamer engine signals
     connect(gstreamerEngine.get(), QOverload<int, int, int, int>::of(&GStreamerEngine::streamInfoChanged),
@@ -183,6 +232,8 @@ void MainWindow::connectSignals() {
             this, &MainWindow::onErrorOccurred);
     connect(gstreamerEngine.get(), &GStreamerEngine::recordingStatusChanged,
             this, &MainWindow::onRecordingStatusChanged);
+    connect(gstreamerEngine.get(), &GStreamerEngine::endOfStream,
+            this, &MainWindow::onEndOfStream);
 }
 
 void MainWindow::onPlayUri(const QString &uri) {
@@ -192,7 +243,32 @@ void MainWindow::onPlayUri(const QString &uri) {
         return;
     }
     Logger::instance().info(QString("MainWindow: Playing URI: %1").arg(uri));
+    currentPlaybackIsLocal = false;
+    currentLocalFilePath.clear();
+    localEndHandled = false;
+    localFileList->setNowPlayingFilePath(QString());
     gstreamerEngine->play(uri);
+    controlBar->setPlaybackState(PlaybackState::Playing);
+}
+
+void MainWindow::onPlayLocalFile(const QString &filePath) {
+    playLocalFilePath(filePath, false);
+}
+
+void MainWindow::playLocalFilePath(const QString &filePath, bool restartPlayback) {
+    currentLocalFilePath = filePath;
+    currentPlaybackIsLocal = true;
+    localEndHandled = false;
+    quickConnectBar->setLocalMode(true);
+    setLocalFilePanelVisible(true);
+    localFileList->setNowPlayingFilePath(filePath);
+    const QString uri = QUrl::fromLocalFile(filePath).toString();
+    Logger::instance().info(QString("MainWindow: Playing local file: %1").arg(filePath));
+    if (restartPlayback) {
+        gstreamerEngine->restart(uri);
+    } else {
+        gstreamerEngine->play(uri);
+    }
     controlBar->setPlaybackState(PlaybackState::Playing);
 }
 
@@ -208,6 +284,9 @@ void MainWindow::onShowSettings() {
         recordingManager->setRecordingPath(dialog.getRecordingPath());
         recordingManager->setScreenshotPath(dialog.getScreenshotPath());
         settings.setValue("recordingFormat", dialog.getRecordingFormat());
+        playbackEndMode = static_cast<PlaybackEndMode>(qBound(0, dialog.getLoopMode(), 2));
+        controlBar->setPlaybackEndMode(playbackEndMode);
+        settings.setValue("loopMode", static_cast<int>(playbackEndMode));
         const int networkLatency = qBound(kMinNetworkLatencyMs, dialog.getNetworkLatency(), kMaxNetworkLatencyMs);
         settings.setValue("networkLatency", networkLatency);
         gstreamerEngine->setNetworkLatency(networkLatency);
@@ -221,10 +300,21 @@ void MainWindow::onShowAbout() {
 }
 
 void MainWindow::onPlayPause() {
+    hidePlaybackOverlay();
     if (gstreamerEngine->isPlaying()) {
         Logger::instance().info("MainWindow: Pause requested");
         gstreamerEngine->pause();
         controlBar->setPlaybackState(PlaybackState::Paused);
+    } else if (gstreamerEngine->isPaused()) {
+        Logger::instance().info("MainWindow: Resume requested");
+        gstreamerEngine->resume();
+        controlBar->setPlaybackState(PlaybackState::Playing);
+        QTimer::singleShot(0, this, [this]() {
+            gstreamerEngine->refreshVideo();
+        });
+        QTimer::singleShot(120, this, [this]() {
+            gstreamerEngine->refreshVideo();
+        });
     } else {
         Logger::instance().info("MainWindow: Play requested");
         QString uri = quickConnectBar->getStreamUri();
@@ -274,6 +364,44 @@ void MainWindow::updateRecordingTime() {
     }
 }
 
+void MainWindow::updatePlaybackPosition() {
+    qint64 positionMs = gstreamerEngine->positionMs();
+    const qint64 durationMs = gstreamerEngine->durationMs();
+    if (playbackPositionSlider && playbackPositionSlider->isSliderDown()) {
+        return;
+    }
+
+    if (pendingSeekRefreshHoldTicks > 0 && pendingSeekPositionMs >= 0) {
+        positionMs = pendingSeekPositionMs;
+        pendingSeekRefreshHoldTicks -= 1;
+    } else {
+        pendingSeekPositionMs = -1;
+    }
+
+    if (currentPlaybackIsLocal && !localEndHandled && gstreamerEngine->isPlaying() &&
+        durationMs > 0 && positionMs >= qMax<qint64>(0, durationMs - 250)) {
+        Logger::instance().info(QString("MainWindow: Local end detected by position fallback (position=%1 ms, duration=%2 ms)")
+                                .arg(positionMs)
+                                .arg(durationMs));
+        onEndOfStream();
+    }
+
+    videoWidget->setPosition(positionMs, durationMs);
+
+    const bool hasDuration = durationMs > 0;
+    isUpdatingPlaybackOverlay = true;
+    playbackPositionSlider->setEnabled(hasDuration);
+    playbackPositionSlider->setMaximum(hasDuration ? static_cast<int>(durationMs / 1000) : 0);
+    if (hasDuration && !playbackPositionSlider->isSliderDown()) {
+        playbackPositionSlider->setValue(static_cast<int>(qBound<qint64>(0, positionMs / 1000, durationMs / 1000)));
+    }
+    isUpdatingPlaybackOverlay = false;
+
+    playbackPositionLabel->setText(positionMs >= 0 ? formatPlaybackTime(positionMs) : "00:00");
+    playbackDurationLabel->setText(hasDuration ? formatPlaybackTime(durationMs) : "--:--");
+    positionPlaybackOverlay();
+}
+
 void MainWindow::onScreenshot() {
     Logger::instance().info("MainWindow: Screenshot requested");
 
@@ -298,22 +426,34 @@ void MainWindow::onScreenshot() {
 }
 
 void MainWindow::onToggleFullScreen() {
+    hidePlaybackOverlay();
     if (isFullScreen) {
         Logger::instance().debug("MainWindow: Exiting fullscreen");
         quickConnectBar->show();
+        isFullScreen = false;
+        setLocalFilePanelVisible(localFilePanelVisible);
         controlBar->show();
         statusBar->show();
         showNormal();
-        isFullScreen = false;
     } else {
         Logger::instance().debug("MainWindow: Entering fullscreen");
         quickConnectBar->hide();
+        localFileList->hide();
         controlBar->hide();
         statusBar->hide();
         showFullScreen();
         isFullScreen = true;
     }
     controlBar->setFullscreen(isFullScreen);
+    QTimer::singleShot(0, this, [this]() {
+        gstreamerEngine->setWindowHandle((WId)videoWidget->winId());
+        gstreamerEngine->refreshVideo();
+        positionPlaybackOverlay();
+    });
+    QTimer::singleShot(120, this, [this]() {
+        gstreamerEngine->refreshVideo();
+        positionPlaybackOverlay();
+    });
 }
 
 void MainWindow::onToggleGrid() {
@@ -324,6 +464,27 @@ void MainWindow::onToggleGrid() {
 
 void MainWindow::onVolumeChanged(int volume) {
     gstreamerEngine->setVolume(volume);
+}
+
+void MainWindow::onSeekRequested(qint64 positionMs) {
+    pendingSeekPositionMs = positionMs;
+    pendingSeekRefreshHoldTicks = 4;
+    gstreamerEngine->seek(positionMs);
+    updatePlaybackPosition();
+    showPlaybackOverlay();
+}
+
+void MainWindow::onStretchToggleRequested(bool stretch) {
+    gstreamerEngine->setStretchVideo(stretch);
+}
+
+void MainWindow::onPlaybackRateChanged(double rate) {
+    gstreamerEngine->setPlaybackRate(rate);
+}
+
+void MainWindow::onPlaybackEndModeChanged(PlaybackEndMode mode) {
+    playbackEndMode = mode;
+    Logger::instance().info(QString("MainWindow: Local playback end mode changed: %1").arg(static_cast<int>(mode)));
 }
 
 void MainWindow::onStreamInfoChanged(int width, int height, int fps, int bitrate) {
@@ -379,6 +540,117 @@ void MainWindow::onRecordingStatusChanged(bool recording, qint64 duration, qint6
     }
 }
 
+void MainWindow::onEndOfStream() {
+    if (localEndHandled) {
+        return;
+    }
+    localEndHandled = true;
+
+    Logger::instance().info(QString("MainWindow: EOS received (local=%1, mode=%2, file=%3)")
+                            .arg(currentPlaybackIsLocal ? "true" : "false")
+                            .arg(static_cast<int>(playbackEndMode))
+                            .arg(currentLocalFilePath));
+    if (!currentPlaybackIsLocal || currentLocalFilePath.isEmpty()) {
+        return;
+    }
+
+    switch (playbackEndMode) {
+    case PlaybackEndMode::Stop:
+        Logger::instance().info("MainWindow: Local file ended, stopping playback");
+        QTimer::singleShot(0, this, [this]() {
+            gstreamerEngine->stop();
+            controlBar->setPlaybackState(PlaybackState::Stopped);
+        });
+        break;
+    case PlaybackEndMode::RepeatOne:
+        Logger::instance().info(QString("MainWindow: Repeating local file: %1").arg(currentLocalFilePath));
+        {
+            const QString repeatPath = currentLocalFilePath;
+            QTimer::singleShot(0, this, [this, repeatPath]() {
+                playLocalFilePath(repeatPath, true);
+            });
+        }
+        break;
+    case PlaybackEndMode::RepeatAll: {
+        const QString nextPath = localFileList->nextFilePath(currentLocalFilePath);
+        if (nextPath.isEmpty()) {
+            Logger::instance().info("MainWindow: Local list ended with no next file");
+            return;
+        }
+        Logger::instance().info(QString("MainWindow: Playing next local file: %1").arg(nextPath));
+        QTimer::singleShot(0, this, [this, nextPath]() {
+            playLocalFilePath(nextPath, true);
+        });
+        break;
+    }
+    }
+}
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+    if (!videoWidget || !centralWidget()) {
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+    switch (event->type()) {
+    case QEvent::Resize:
+    case QEvent::Move:
+        positionPlaybackOverlay();
+        break;
+    case QEvent::MouseMove: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (globalPointInVideo(mouseEvent->globalPosition().toPoint())) {
+            showPlaybackOverlay();
+            if (mousePressedInVideo &&
+                (mouseEvent->globalPosition().toPoint() - videoMousePressGlobalPos).manhattanLength() > 6) {
+                suppressClickToggle = true;
+            }
+        }
+        break;
+    }
+    case QEvent::MouseButtonPress: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton && globalPointInVideo(mouseEvent->globalPosition().toPoint())) {
+            showPlaybackOverlay();
+            mousePressedInVideo = true;
+            suppressClickToggle = false;
+            videoMousePressGlobalPos = mouseEvent->globalPosition().toPoint();
+            if (isOverlayObject(watched)) {
+                suppressClickToggle = watched == playbackPositionSlider;
+            }
+        }
+        break;
+    }
+    case QEvent::MouseButtonRelease: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton && mousePressedInVideo) {
+            showPlaybackOverlay();
+            const int clickDistance = (mouseEvent->globalPosition().toPoint() - videoMousePressGlobalPos).manhattanLength();
+            if (!suppressClickToggle && clickDistance <= 6 && globalPointInVideo(mouseEvent->globalPosition().toPoint())) {
+                Logger::instance().debug("MainWindow: Video click toggled playback");
+                clickTimer->start(80);
+            }
+            mousePressedInVideo = false;
+        }
+        break;
+    }
+    case QEvent::MouseButtonDblClick: {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton && globalPointInVideo(mouseEvent->globalPosition().toPoint())) {
+            clickTimer->stop();
+            suppressClickToggle = true;
+            showPlaybackOverlay();
+            onToggleFullScreen();
+            return true;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return QMainWindow::eventFilter(watched, event);
+}
+
 void MainWindow::keyPressEvent(QKeyEvent *event) {
     switch (event->key()) {
     case Qt::Key_F:
@@ -429,7 +701,7 @@ void MainWindow::loadSettings() {
 
     // Last URI
     QString lastUri = settings.value("lastUri", "").toString();
-    if (!lastUri.isEmpty()) {
+    if (!lastUri.isEmpty() && !isLocalFileUri(lastUri)) {
         quickConnectBar->setUri(lastUri);
     }
 
@@ -437,6 +709,18 @@ void MainWindow::loadSettings() {
     int volume = qBound(0, settings.value("volume", 50).toInt(), 100);
     controlBar->setVolume(volume);
     gstreamerEngine->setVolume(volume);
+
+    const double playbackRate = settings.value("playbackRate", 1.0).toDouble();
+    controlBar->setPlaybackRate(playbackRate);
+    gstreamerEngine->setPlaybackRate(playbackRate);
+
+    const bool stretchVideo = settings.value("stretchVideo", false).toBool();
+    controlBar->setStretchActive(stretchVideo);
+    gstreamerEngine->setStretchVideo(stretchVideo);
+
+    playbackEndMode = static_cast<PlaybackEndMode>(
+        qBound(0, settings.value("loopMode", static_cast<int>(PlaybackEndMode::Stop)).toInt(), 2));
+    controlBar->setPlaybackEndMode(playbackEndMode);
 
     // Network latency
     int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
@@ -448,6 +732,13 @@ void MainWindow::loadSettings() {
     QString screenshotPath = settings.value("screenshotPath", "").toString();
     recordingManager->setScreenshotPath(screenshotPath);
 
+    // Local file list
+    localFileList->loadSettings();
+
+    const bool localMode = settings.value("localMode", false).toBool();
+    quickConnectBar->setLocalMode(localMode);
+    setLocalFilePanelVisible(localMode);
+
     Logger::instance().debug(QString("MainWindow: Settings loaded (volume=%1, latency=%2 ms)").arg(volume).arg(networkLatency));
 }
 
@@ -458,10 +749,16 @@ void MainWindow::saveSettings() {
     settings.setValue("geometry", saveGeometry());
 
     // Last URI
-    settings.setValue("lastUri", quickConnectBar->getStreamUri());
+    const QString currentUri = quickConnectBar->getStreamUri();
+    if (!isLocalFileUri(currentUri)) {
+        settings.setValue("lastUri", currentUri);
+    }
 
     // Volume
     settings.setValue("volume", controlBar->volume());
+    settings.setValue("playbackRate", gstreamerEngine->playbackRate());
+    settings.setValue("stretchVideo", gstreamerEngine->stretchVideo());
+    settings.setValue("loopMode", static_cast<int>(playbackEndMode));
 
     // Network latency
     int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
@@ -471,7 +768,164 @@ void MainWindow::saveSettings() {
     settings.setValue("recordingPath", recordingManager->getRecordingPath());
     settings.setValue("screenshotPath", recordingManager->getScreenshotPath());
 
+    // Local file list
+    localFileList->saveSettings();
+    settings.setValue("localMode", quickConnectBar->isLocalMode());
+
     Logger::instance().debug("MainWindow: Settings saved");
+}
+
+void MainWindow::setLocalFilePanelVisible(bool visible) {
+    localFilePanelVisible = visible;
+    if (isFullScreen) {
+        localFileList->hide();
+        return;
+    }
+
+    localFileList->setVisible(visible);
+    if (contentSplitter) {
+        contentSplitter->setSizes(visible ? QList<int>{260, 1020} : QList<int>{0, 1280});
+    }
+}
+
+void MainWindow::setupPlaybackOverlay(QWidget *parent) {
+    playbackOverlay = new QWidget(parent);
+    playbackOverlay->setVisible(false);
+    playbackOverlay->setMouseTracking(true);
+    playbackOverlay->setStyleSheet(R"(
+        QWidget {
+            background-color: rgba(0, 0, 0, 165);
+            border-radius: 6px;
+        }
+        QLabel {
+            color: #FFFFFF;
+            background: transparent;
+        }
+        QSlider {
+            background: transparent;
+        }
+        QSlider::groove:horizontal {
+            border: none;
+            height: 5px;
+            background: rgba(255, 255, 255, 90);
+            border-radius: 2px;
+        }
+        QSlider::sub-page:horizontal {
+            background: #DDE7F8;
+            border-radius: 2px;
+        }
+        QSlider::handle:horizontal {
+            background: #FFFFFF;
+            border: none;
+            width: 14px;
+            margin: -5px 0;
+            border-radius: 7px;
+        }
+    )");
+
+    auto *layout = new QHBoxLayout(playbackOverlay);
+    layout->setContentsMargins(12, 8, 12, 8);
+    layout->setSpacing(10);
+
+    playbackPositionLabel = new QLabel("00:00", playbackOverlay);
+    playbackPositionLabel->setMinimumWidth(46);
+    layout->addWidget(playbackPositionLabel);
+
+    playbackPositionSlider = new QSlider(Qt::Horizontal, playbackOverlay);
+    playbackPositionSlider->setMinimum(0);
+    playbackPositionSlider->setMaximum(0);
+    playbackPositionSlider->setEnabled(false);
+    layout->addWidget(playbackPositionSlider, 1);
+
+    playbackDurationLabel = new QLabel("--:--", playbackOverlay);
+    playbackDurationLabel->setMinimumWidth(46);
+    layout->addWidget(playbackDurationLabel);
+
+    connect(playbackPositionSlider, &QSlider::sliderPressed, this, &MainWindow::showPlaybackOverlay);
+    connect(playbackPositionSlider, &QSlider::sliderMoved, this, [this](int value) {
+        if (!isUpdatingPlaybackOverlay) {
+            playbackPositionLabel->setText(formatPlaybackTime(value * 1000LL));
+        }
+        showPlaybackOverlay();
+    });
+    connect(playbackPositionSlider, &QSlider::sliderReleased, this, [this]() {
+        onSeekRequested(playbackPositionSlider->value() * 1000LL);
+    });
+
+    positionPlaybackOverlay();
+}
+
+void MainWindow::positionPlaybackOverlay() {
+    if (!playbackOverlay || !centralWidget() || !videoWidget) {
+        return;
+    }
+
+    const QPoint videoTopLeft = centralWidget()->mapFromGlobal(videoWidget->mapToGlobal(QPoint(0, 0)));
+    const QSize videoSize = videoWidget->size();
+    const int margin = 18;
+    const int overlayHeight = 42;
+    playbackOverlay->setGeometry(videoTopLeft.x() + margin,
+                                 videoTopLeft.y() + qMax(margin, videoSize.height() - overlayHeight - margin),
+                                 qMax(0, videoSize.width() - margin * 2),
+                                 overlayHeight);
+}
+
+void MainWindow::showPlaybackOverlay() {
+    if (!playbackOverlay) {
+        return;
+    }
+
+    positionPlaybackOverlay();
+    playbackOverlay->show();
+    playbackOverlay->raise();
+    overlayHideTimer->start(3000);
+}
+
+void MainWindow::hidePlaybackOverlay() {
+    if (playbackPositionSlider && playbackPositionSlider->isSliderDown()) {
+        showPlaybackOverlay();
+        return;
+    }
+    if (playbackOverlay) {
+        playbackOverlay->hide();
+    }
+}
+
+bool MainWindow::globalPointInVideo(const QPoint &globalPos) const {
+    if (!videoWidget) {
+        return false;
+    }
+
+    const QPoint localPos = videoWidget->mapFromGlobal(globalPos);
+    return videoWidget->rect().contains(localPos);
+}
+
+bool MainWindow::isOverlayObject(QObject *object) const {
+    auto *widget = qobject_cast<QWidget *>(object);
+    return widget && playbackOverlay && (widget == playbackOverlay || playbackOverlay->isAncestorOf(widget));
+}
+
+QString MainWindow::formatPlaybackTime(qint64 milliseconds) const {
+    if (milliseconds < 0) {
+        return "--:--";
+    }
+
+    qint64 seconds = milliseconds / 1000;
+    const qint64 hours = seconds / 3600;
+    seconds %= 3600;
+    const qint64 minutes = seconds / 60;
+    seconds %= 60;
+
+    if (hours > 0) {
+        return QString("%1:%2:%3")
+            .arg(hours)
+            .arg(minutes, 2, 10, QChar('0'))
+            .arg(seconds, 2, 10, QChar('0'));
+    }
+
+    return QString("%1:%2")
+        .arg(minutes, 2, 10, QChar('0'))
+        .arg(seconds, 2, 10, QChar('0'));
 }
 
 

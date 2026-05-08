@@ -15,6 +15,8 @@
 #include <QPushButton>
 #include <QLabel>
 
+class QButtonGroup;
+
 class QuickConnectBar : public QWidget {
     Q_OBJECT
 
@@ -24,10 +26,13 @@ public:
     QString getStreamUri() const;
     void addToHistory(const QString &uri);
     void setUri(const QString &uri);
+    void setLocalMode(bool localMode);
+    bool isLocalMode() const;
 
 signals:
     void playRequested(const QString &uri);
     void settingsRequested();
+    void localModeChanged(bool localMode);
 
 private:
     void setupUI();
@@ -35,8 +40,12 @@ private:
     void loadHistory();
 
     QLabel *titleLabel;
+    QButtonGroup *modeGroup;
+    QPushButton *streamModeButton;
+    QPushButton *localModeButton;
     QLineEdit *uriInput;
     QPushButton *settingsButton;
+    QString lastStreamUri;
 };
 
 #endif // QUICK_CONNECT_BAR_H

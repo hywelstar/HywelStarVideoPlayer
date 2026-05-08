@@ -43,11 +43,21 @@ public:
     ~GStreamerEngine();
 
     void play(const QString &uri);
+    void restart(const QString &uri);
+    void resume();
     void pause();
     void stop();
     void setVolume(int volume);
     void setNetworkLatency(int latencyMs);
     void setWindowHandle(WId windowId);
+    void refreshVideo();
+    void seek(qint64 positionMs);
+    qint64 positionMs() const;
+    qint64 durationMs() const;
+    void setPlaybackRate(double rate);
+    double playbackRate() const;
+    void setStretchVideo(bool stretch);
+    bool stretchVideo() const;
 
     bool startRecording(const QString &filepath);
     void stopRecording();
@@ -69,6 +79,7 @@ signals:
     void streamInfoChanged(int width, int height, int fps, int bitrate);
     void latencyChanged(int latencyMs);
     void recordingStatusChanged(bool recording, qint64 duration, qint64 fileSize);
+    void endOfStream();
 
 private:
 #ifndef ANDROID
@@ -130,6 +141,8 @@ private:
     WId windowHandle = 0;
     int currentVolume = 50;
     int networkLatencyMs = 200;
+    double currentPlaybackRate = 1.0;
+    bool stretchVideoEnabled = false;
 };
 
 #endif // GSTREAMER_ENGINE_H

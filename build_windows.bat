@@ -6,6 +6,11 @@ REM HywelStar Video Player - Windows Build Script
 REM ============================================================================
 
 set "SCRIPT_DIR=%~dp0"
+
+if /I "%~1"=="--help" goto :usage
+if /I "%~1"=="-h" goto :usage
+if /I "%~1"=="/?" goto :usage
+
 if exist "%SCRIPT_DIR%env.local.bat" (
     call "%SCRIPT_DIR%env.local.bat"
 )
@@ -75,8 +80,20 @@ echo.
 echo Building...
 cmake --build "%BUILD_DIR%" --config %BUILD_TYPE%
 if errorlevel 1 (
-    echo Build failed!
-    exit /b 1
+    echo Build failed. Checking whether HywelStarVideoPlayer.exe is still running...
+    taskkill /IM HywelStarVideoPlayer.exe /F >nul 2>nul
+    if errorlevel 1 (
+        echo No running HywelStarVideoPlayer.exe process was closed.
+        echo Build failed!
+        exit /b 1
+    )
+
+    echo Closed running HywelStarVideoPlayer.exe. Retrying build...
+    cmake --build "%BUILD_DIR%" --config %BUILD_TYPE%
+    if errorlevel 1 (
+        echo Build failed after retry!
+        exit /b 1
+    )
 )
 
 echo.
@@ -85,3 +102,26 @@ echo Output: %BUILD_DIR%\%BUILD_TYPE%\HywelStarVideoPlayer.exe
 echo.
 
 endlocal
+exit /b 0
+
+:usage
+echo.
+echo HywelStar Video Player Windows Build
+echo.
+echo Usage:
+echo   build_windows.bat [Debug^|Release] [clean]
+echo   build_windows.bat clean
+echo   build_windows.bat --help
+echo.
+echo Options:
+echo   Debug      Build Debug configuration.
+echo   Release    Build Release configuration. This is the default.
+echo   clean      Remove build\windows_x64 before configuring.
+echo   --help     Show this help text.
+echo.
+echo Environment:
+echo   QT_PATH              Path to Qt MSVC install, for example F:\QT\6.10.0\msvc2022_64
+echo   GSTREAMER_ROOT_DIR   Path to GStreamer MSVC install, for example E:\gstreamer\1.0\msvc_x86_64
+echo.
+endlocal
+exit /b 0
