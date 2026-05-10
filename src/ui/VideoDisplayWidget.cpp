@@ -320,7 +320,13 @@ void VideoDisplayWidget::drawLoadingAnimation(QPainter &painter) {
 
     QString helpText = "F-Fullscreen | G-Grid | +/- Zoom | Space-Play/Pause | R-Record | S-Screenshot";
     QRect textRect = painter.fontMetrics().boundingRect(helpText);
-    textRect.moveTo(10, height() - 30);
+    textRect.adjust(-8, -4, 8, 4);
+    textRect.moveTo(12, 12);
 
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0, 0, 0, 130));
+    painter.drawRoundedRect(textRect, 4, 4);
+
+    painter.setPen(QPen(QColor(255, 255, 255, 210), 1));
     painter.drawText(textRect, Qt::AlignLeft, helpText);
 }

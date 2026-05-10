@@ -185,7 +185,7 @@ void MainWindow::connectSignals() {
     connect(quickConnectBar.get(), &QuickConnectBar::settingsRequested,
             this, &MainWindow::onShowSettings);
     connect(quickConnectBar.get(), &QuickConnectBar::localModeChanged,
-            this, &MainWindow::setLocalFilePanelVisible);
+            this, &MainWindow::onPlaybackModeChanged);
 
     // Local file list signals
     connect(localFileList.get(), &LocalFileListWidget::playFileRequested,
@@ -243,8 +243,10 @@ void MainWindow::onPlayUri(const QString &uri) {
         return;
     }
     Logger::instance().info(QString("MainWindow: Playing URI: %1").arg(uri));
+    currentStreamUri = uri;
     currentPlaybackIsLocal = false;
     currentLocalFilePath.clear();
+    streamStoppedForPause = false;
     localEndHandled = false;
     localFileList->setNowPlayingFilePath(QString());
     gstreamerEngine->play(uri);
@@ -255,9 +257,29 @@ void MainWindow::onPlayLocalFile(const QString &filePath) {
     playLocalFilePath(filePath, false);
 }
 
+void MainWindow::onPlaybackModeChanged(bool localMode) {
+    Logger::instance().info(QString("MainWindow: Playback mode changed to %1, stopping current playback")
+                            .arg(localMode ? "Local" : "Stream"));
+
+    hidePlaybackOverlay();
+    gstreamerEngine->stop();
+    controlBar->setPlaybackState(PlaybackState::Stopped);
+    currentPlaybackIsLocal = false;
+    currentLocalFilePath.clear();
+    streamStoppedForPause = false;
+    localEndHandled = false;
+    pendingSeekPositionMs = -1;
+    pendingSeekRefreshHoldTicks = 0;
+    localFileList->setNowPlayingFilePath(QString());
+    videoWidget->setPosition(-1, -1);
+
+    setLocalFilePanelVisible(localMode);
+}
+
 void MainWindow::playLocalFilePath(const QString &filePath, bool restartPlayback) {
     currentLocalFilePath = filePath;
     currentPlaybackIsLocal = true;
+    streamStoppedForPause = false;
     localEndHandled = false;
     quickConnectBar->setLocalMode(true);
     setLocalFilePanelVisible(true);
@@ -302,9 +324,25 @@ void MainWindow::onShowAbout() {
 void MainWindow::onPlayPause() {
     hidePlaybackOverlay();
     if (gstreamerEngine->isPlaying()) {
-        Logger::instance().info("MainWindow: Pause requested");
-        gstreamerEngine->pause();
+        if (currentPlaybackIsLocal) {
+            Logger::instance().info("MainWindow: Pause requested");
+            gstreamerEngine->pause();
+        } else {
+            currentStreamUri = quickConnectBar->getStreamUri();
+            streamStoppedForPause = true;
+            Logger::instance().info(QString("MainWindow: Stream pause requested, stopping live stream: %1").arg(currentStreamUri));
+            gstreamerEngine->stop();
+        }
         controlBar->setPlaybackState(PlaybackState::Paused);
+    } else if (streamStoppedForPause) {
+        const QString uri = currentStreamUri.isEmpty() ? quickConnectBar->getStreamUri() : currentStreamUri;
+        Logger::instance().info(QString("MainWindow: Stream resume requested, reconnecting: %1").arg(uri));
+        if (!uri.isEmpty() && isValidStreamUri(uri)) {
+            streamStoppedForPause = false;
+            onPlayUri(uri);
+        } else if (!uri.isEmpty()) {
+            statusBar->showError("Invalid stream URI");
+        }
     } else if (gstreamerEngine->isPaused()) {
         Logger::instance().info("MainWindow: Resume requested");
         gstreamerEngine->resume();
@@ -319,8 +357,7 @@ void MainWindow::onPlayPause() {
         Logger::instance().info("MainWindow: Play requested");
         QString uri = quickConnectBar->getStreamUri();
         if (!uri.isEmpty() && isValidStreamUri(uri)) {
-            gstreamerEngine->play(uri);
-            controlBar->setPlaybackState(PlaybackState::Playing);
+            onPlayUri(uri);
         } else if (!uri.isEmpty()) {
             statusBar->showError("Invalid stream URI");
         }
@@ -927,8 +964,6 @@ QString MainWindow::formatPlaybackTime(qint64 milliseconds) const {
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0'));
 }
-
-
 
 
 

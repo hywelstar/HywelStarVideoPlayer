@@ -47,6 +47,7 @@ private slots:
     // QuickConnectBar slots
     void onPlayUri(const QString &uri);
     void onPlayLocalFile(const QString &filePath);
+    void onPlaybackModeChanged(bool localMode);
     void onShowSettings();
     void onShowAbout();
 
@@ -113,8 +114,10 @@ private:
     bool isGridVisible = false;
     bool localFilePanelVisible = false;
     PlaybackEndMode playbackEndMode = PlaybackEndMode::Stop;
+    QString currentStreamUri;
     QString currentLocalFilePath;
     bool currentPlaybackIsLocal = false;
+    bool streamStoppedForPause = false;
     bool localEndHandled = false;
     bool isUpdatingPlaybackOverlay = false;
     qint64 pendingSeekPositionMs = -1;

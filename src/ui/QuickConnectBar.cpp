@@ -28,6 +28,7 @@ void QuickConnectBar::setupUI() {
 
     // App title label
     titleLabel = new QLabel("HywelStar Player");
+    titleLabel->setVisible(false);
     layout->addWidget(titleLabel);
 
     modeGroup = new QButtonGroup(this);
