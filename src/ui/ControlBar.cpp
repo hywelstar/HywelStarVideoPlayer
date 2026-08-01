@@ -146,11 +146,12 @@ void ControlBar::setupUI() {
     speedComboBox->setMinimumWidth(76);
     layout->addWidget(speedComboBox);
 
-    // Volume icon
-    volumeLabel = new QLabel();
-    volumeLabel->setPixmap(QIcon(":/icons/volume").pixmap(20, 20));
-    volumeLabel->setStyleSheet("background-color: #FFFFFF; padding: 6px; border-radius: 6px; border: 1px solid #D7DCE3;");
-    layout->addWidget(volumeLabel);
+    // Mute button
+    muteButton = new QPushButton();
+    muteButton->setIcon(QIcon(":/icons/volume"));
+    muteButton->setIconSize(QSize(20, 20));
+    muteButton->setToolTip(tr("Mute"));
+    layout->addWidget(muteButton);
 
     // Volume slider
     volumeSlider = new QSlider(Qt::Horizontal);
@@ -210,11 +211,22 @@ void ControlBar::connectSignals() {
     connect(speedComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int index) {
         emit playbackRateChanged(speedComboBox->itemData(index).toDouble());
     });
+    connect(muteButton, &QPushButton::clicked, this, [this]() {
+        if (volumeSlider->value() == 0) {
+            volumeSlider->setValue(qBound(1, lastNonZeroVolume, 100));
+        } else {
+            lastNonZeroVolume = volumeSlider->value();
+            volumeSlider->setValue(0);
+        }
+    });
     connect(volumeSlider, &QSlider::valueChanged, this, [this](int value) {
         if (value == 0) {
-            volumeLabel->setPixmap(QIcon(":/icons/volume_mute").pixmap(20, 20));
+            muteButton->setIcon(QIcon(":/icons/volume_mute"));
+            muteButton->setToolTip(tr("Unmute"));
         } else {
-            volumeLabel->setPixmap(QIcon(":/icons/volume").pixmap(20, 20));
+            lastNonZeroVolume = value;
+            muteButton->setIcon(QIcon(":/icons/volume"));
+            muteButton->setToolTip(tr("Mute"));
         }
         emit volumeChanged(value);
     });
@@ -312,7 +324,6 @@ void ControlBar::setPlaybackEndMode(PlaybackEndMode mode) {
 PlaybackEndMode ControlBar::playbackEndMode() const {
     return static_cast<PlaybackEndMode>(endModeComboBox->currentData().toInt());
 }
-
 
 
 

@@ -74,10 +74,11 @@ private:
     QComboBox *speedComboBox;
     QSlider *volumeSlider;
     QLabel *recordingTimeLabel;
-    QLabel *volumeLabel;
+    QPushButton *muteButton;
 
     bool isRecording = false;
     PlaybackState playbackState = PlaybackState::Stopped;
+    int lastNonZeroVolume = 50;
 };
 
 #endif // CONTROL_BAR_H

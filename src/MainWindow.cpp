@@ -743,7 +743,7 @@ void MainWindow::loadSettings() {
     }
 
     // Volume
-    int volume = qBound(0, settings.value("volume", 50).toInt(), 100);
+    int volume = qBound(0, settings.value("volume", 80).toInt(), 100);
     controlBar->setVolume(volume);
     gstreamerEngine->setVolume(volume);
 
@@ -964,7 +964,6 @@ QString MainWindow::formatPlaybackTime(qint64 milliseconds) const {
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0'));
 }
-
 
 
 

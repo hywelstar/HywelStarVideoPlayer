@@ -103,6 +103,8 @@ private:
     GstElement *pipeline = nullptr;
     GstElement *videoSink = nullptr;
     GstElement *videoSinkBin = nullptr;
+    GstElement *audioSinkBin = nullptr;
+    GstElement *volumeElement = nullptr;
     GstElement *tee = nullptr;
     GstElement *fileSink = nullptr;
     GstElement *recordingQueue = nullptr;
@@ -126,6 +128,8 @@ private:
     void *pipeline = nullptr;
     void *videoSink = nullptr;
     void *videoSinkBin = nullptr;
+    void *audioSinkBin = nullptr;
+    void *volumeElement = nullptr;
     void *tee = nullptr;
     void *fileSink = nullptr;
     void *recordingQueue = nullptr;
@@ -146,7 +150,6 @@ private:
 };
 
 #endif // GSTREAMER_ENGINE_H
-
 
 
 

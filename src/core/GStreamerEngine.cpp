@@ -369,8 +369,12 @@ void GStreamerEngine::stop() {
 void GStreamerEngine::setVolume(int volume) {
 #ifndef ANDROID
     currentVolume = qBound(0, volume, 100);
+    const gdouble vol = currentVolume / 100.0;
+    if (volumeElement) {
+        g_object_set(G_OBJECT(volumeElement), "volume", vol, nullptr);
+    }
     if (pipeline) {
-        gdouble vol = currentVolume / 100.0;
+        g_object_set(G_OBJECT(pipeline), "mute", currentVolume == 0, nullptr);
         g_object_set(G_OBJECT(pipeline), "volume", vol, nullptr);
     }
 #else
@@ -1085,15 +1089,37 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         videoSinkBin = nullptr;
         tee = nullptr;
 
+        audioSinkBin = gst_bin_new("audiosinkbin");
+        volumeElement = gst_element_factory_make("volume", "audiovolume");
+        GstElement *audioConvert = gst_element_factory_make("audioconvert", "audioconvert");
+        GstElement *audioResample = gst_element_factory_make("audioresample", "audioresample");
         GstElement *audioSink = gst_element_factory_make("wasapi2sink", "audiosink");
         if (!audioSink) {
             audioSink = gst_element_factory_make("autoaudiosink", "audiosink");
         }
-        if (audioSink) {
-            g_object_set(pipeline, "audio-sink", audioSink, nullptr);
-            gst_object_unref(audioSink);
+
+        if (audioSinkBin && volumeElement && audioConvert && audioResample && audioSink) {
+            g_object_set(G_OBJECT(volumeElement), "volume", currentVolume / 100.0, nullptr);
+            gst_bin_add_many(GST_BIN(audioSinkBin), volumeElement, audioConvert, audioResample, audioSink, nullptr);
+            if (gst_element_link_many(volumeElement, audioConvert, audioResample, audioSink, nullptr)) {
+                GstPad *audioSinkPad = gst_element_get_static_pad(volumeElement, "sink");
+                gst_element_add_pad(audioSinkBin, gst_ghost_pad_new("sink", audioSinkPad));
+                gst_object_unref(audioSinkPad);
+                g_object_set(pipeline, "audio-sink", audioSinkBin, nullptr);
+                g_object_set(G_OBJECT(pipeline), "mute", currentVolume == 0, nullptr);
+            } else {
+                Logger::instance().warning("GStreamerEngine: Failed to link explicit audio sink bin, using playbin default");
+                gst_object_unref(audioSinkBin);
+                audioSinkBin = nullptr;
+                volumeElement = nullptr;
+            }
         } else {
             Logger::instance().warning("GStreamerEngine: Failed to create explicit audio sink, using playbin default");
+            if (audioSinkBin) {
+                gst_object_unref(audioSinkBin);
+            }
+            audioSinkBin = nullptr;
+            volumeElement = nullptr;
         }
 
         GstBus *bus = gst_element_get_bus(pipeline);
@@ -1109,8 +1135,16 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     tee = gst_element_factory_make("tee", "t");
     GstElement *queue = gst_element_factory_make("queue", "displayqueue");
     videoSink = gst_element_factory_make("d3d11videosink", "videosink");
+    audioSinkBin = gst_bin_new("audiosinkbin");
+    volumeElement = gst_element_factory_make("volume", "audiovolume");
+    GstElement *audioConvert = gst_element_factory_make("audioconvert", "audioconvert");
+    GstElement *audioResample = gst_element_factory_make("audioresample", "audioresample");
+    GstElement *audioSink = gst_element_factory_make("wasapi2sink", "audiosink");
+    if (!audioSink) {
+        audioSink = gst_element_factory_make("autoaudiosink", "audiosink");
+    }
 
-    if (!tee || !queue || !videoSink) {
+    if (!tee || !queue || !videoSink || !audioSinkBin || !volumeElement || !audioConvert || !audioResample || !audioSink) {
         Logger::instance().error("GStreamerEngine: Failed to create video sink elements");
         emit errorOccurred("Failed to create video sink elements");
         gst_object_unref(pipeline);
@@ -1120,6 +1154,11 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         if (tee) gst_object_unref(tee);
         if (queue) gst_object_unref(queue);
         if (videoSink) gst_object_unref(videoSink);
+        if (audioSinkBin) gst_object_unref(audioSinkBin);
+        if (volumeElement) gst_object_unref(volumeElement);
+        if (audioConvert) gst_object_unref(audioConvert);
+        if (audioResample) gst_object_unref(audioResample);
+        if (audioSink) gst_object_unref(audioSink);
         gst_object_unref(videoSinkBin);
         return;
     }
@@ -1141,14 +1180,19 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     setStretchVideo(stretchVideoEnabled);
 
     gst_bin_add_many(GST_BIN(videoSinkBin), tee, queue, videoSink, nullptr);
+    g_object_set(G_OBJECT(volumeElement), "volume", currentVolume / 100.0, nullptr);
+    gst_bin_add_many(GST_BIN(audioSinkBin), volumeElement, audioConvert, audioResample, audioSink, nullptr);
     if (!gst_element_link(tee, queue) ||
-        !gst_element_link(queue, videoSink)) {
+        !gst_element_link(queue, videoSink) ||
+        !gst_element_link_many(volumeElement, audioConvert, audioResample, audioSink, nullptr)) {
         Logger::instance().error("GStreamerEngine: Failed to link video sink elements");
         emit errorOccurred("Failed to link video sink elements");
         gst_object_unref(pipeline);
         pipeline = nullptr;
         videoSink = nullptr;
         videoSinkBin = nullptr;
+        audioSinkBin = nullptr;
+        volumeElement = nullptr;
         tee = nullptr;
         return;
     }
@@ -1158,6 +1202,10 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     gst_element_add_pad(videoSinkBin, gst_ghost_pad_new("sink", sinkPad));
     gst_object_unref(sinkPad);
 
+    GstPad *audioSinkPad = gst_element_get_static_pad(volumeElement, "sink");
+    gst_element_add_pad(audioSinkBin, gst_ghost_pad_new("sink", audioSinkPad));
+    gst_object_unref(audioSinkPad);
+
     // Set window handle
     if (windowHandle != 0) {
         gst_video_overlay_set_window_handle(GST_VIDEO_OVERLAY(videoSink), windowHandle);
@@ -1166,6 +1214,8 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
     // Set video-sink on playbin
     g_object_set(pipeline, "video-sink", videoSinkBin, nullptr);
+    g_object_set(pipeline, "audio-sink", audioSinkBin, nullptr);
+    g_object_set(G_OBJECT(pipeline), "mute", currentVolume == 0, nullptr);
 
     // Probe decoded video buffers for realtime FPS/bitrate in status bar
     videoProbePad = gst_element_get_static_pad(tee, "sink");
@@ -1234,6 +1284,8 @@ void GStreamerEngine::cleanupPipeline() {
         pipeline = nullptr;
         videoSink = nullptr;
         videoSinkBin = nullptr;
+        audioSinkBin = nullptr;
+        volumeElement = nullptr;
         tee = nullptr;
     }
 #endif
@@ -1258,7 +1310,6 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
-
 
 
 
