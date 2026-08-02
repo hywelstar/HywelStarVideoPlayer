@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     // So we create a minimal app first, set env, then continue
     QApplication app(argc, argv);
     app.setApplicationName("HywelStarVideoPlayer");
-    app.setApplicationVersion("1.0.0");
+    app.setApplicationVersion("1.1.2");
     app.setOrganizationName("HywelStar");
 
     // Setup GStreamer environment

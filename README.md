@@ -2,7 +2,7 @@
 
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP, SRT, HLS, DASH, HTTP streams and local video files.
 
-<img width="1280" height="750" alt="image" src="https://github.com/user-attachments/assets/fe442e40-af6e-4d13-9d31-4e4bacb46fae" />
+![image-20260802142054603](image/image-20260802142054603.png)
 
 ## Development Progress
 
@@ -23,10 +23,10 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP,
 | RTSP Stream Playback | Done | H.264/H.265 |
 | UDP Stream Playback | Done | H.264/H.265 |
 | TCP Stream Playback | Done | Basic URI support |
-| RTMP/RTMPS Playback | Done | URI recognition and playbin3 playback |
-| SRT Playback | Done | URI recognition and playbin3 playback |
-| HLS Playback | Done | HTTP/HTTPS `.m3u8` |
-| MPEG-DASH Playback | Done | HTTP/HTTPS `.mpd` |
+| RTMP/RTMPS Playback | Done | Tested with public RTMP stream |
+| SRT Playback | Done | URI recognition and playbin3 playback; source validation pending |
+| HLS Playback | Done | Tested with HTTPS `.m3u8` |
+| MPEG-DASH Playback | Done | Tested with HTTPS `.mpd` |
 | HTTP/HTTPS Playback | Done | Progressive streams and MJPEG URLs |
 | Local File Playback | Done | MP4, MKV, AVI, etc. |
 | Stream/Local Mode Switch | Done | Separate stream URL and local playback workflows |
@@ -36,7 +36,7 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP,
 | Playback Speed Control | Done | 0.5x - 2x |
 | Fit/Stretch Display | Done | Aspect fit or stretch toggle |
 | Bitrate Display | Done | Local average bitrate and RTSP RTP video bitrate |
-| Video Recording | Done | MKV format |
+| Video Recording | Done | MKV format, local and stream playback recording |
 | Screenshot | Done | PNG format |
 | Grid Overlay | Done | For positioning |
 | Fullscreen Mode | Done | F key / double-click |
@@ -166,6 +166,17 @@ deploy_windows.bat Release
 - **Bitrate display**: local files show average media bitrate; RTSP streams show measured RTP video bitrate when available.
 - **Theme**: choose System, Light, or Dark from Settings.
 
+## Tested Stream URLs
+
+| Protocol | Status | URL |
+|----------|--------|-----|
+| RTSP | Passed | `rtsp://192.168.1.39:8554/video/slamtv60.264` |
+| RTMP | Passed | `rtmp://liteavapp.qcloud.com/live/liteavdemoplayerstreamid` |
+| HLS | Passed | `https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8` |
+| MPEG-DASH | Passed | `https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd` |
+| SRT | Pending | Requires a reachable SRT source/server |
+| MJPEG | Pending | Use a trusted camera or local MJPEG test service |
+
 ## Project Structure
 
 ```text
@@ -200,6 +211,13 @@ HywelStarPlayer/
 - **Build System**: CMake 3.16+
 
 ## Changelog
+
+### v1.1.2 (Released 2026-08-02)
+- Added tested RTSP, RTMP, HLS, and MPEG-DASH stream coverage notes.
+- Improved stream protocol diagnostics for RTMP, SRT, HLS, DASH, HTTP/MJPEG, and HTTPS TLS runtime dependencies.
+- Fixed HTTPS HLS playback in portable deployments by packaging GIO TLS modules and setting `GIO_MODULE_DIR`.
+- Fixed local and network stream recording startup failures caused by D3D11 memory negotiation.
+- Improved recording stability by isolating the recording branch from playback preview backpressure.
 
 ### v1.1.1 (Released 2026-08-02)
 - Fixed playback volume control and mute/unmute behavior.
