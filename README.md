@@ -185,6 +185,12 @@ HywelStarPlayer/
 
 ## Changelog
 
+### v1.1.1 (Released 2026-08-02)
+- Fixed playback volume control and mute/unmute behavior.
+- Fixed bitrate reporting for local files and RTSP video streams.
+- Added System/Light/Dark theme support and improved dark theme readability.
+- Fixed fullscreen playback so the menu bar is hidden in immersive mode.
+
 ### v1.1.0 (Released 2026-05-08)
 - Added Stream/Local mode switching in the top bar.
 - Added local file list with file/folder import and persisted playlist.
