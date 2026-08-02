@@ -11,6 +11,7 @@
 #include "utils/Logger.h"
 #include <QDebug>
 #include <QUrl>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QStringList>
@@ -28,6 +29,204 @@ constexpr int kMaxNetworkLatencyMs = 5000;
 #ifndef ANDROID
 constexpr GstClockTime kStutterGapThresholdNs = 80 * GST_MSECOND;
 #endif
+
+enum class StreamProtocol {
+    Local,
+    RTSP,
+    RTMP,
+    SRT,
+    HLS,
+    DASH,
+    HTTP,
+    MJPEG,
+    Other
+};
+
+StreamProtocol detectProtocol(const QString &uri) {
+    const QUrl url(uri);
+    const QString scheme = url.scheme().toLower();
+    const QString path = url.path().toLower();
+
+    if (url.isLocalFile() || scheme == "file") {
+        return StreamProtocol::Local;
+    }
+    if (scheme == "rtsp") {
+        return StreamProtocol::RTSP;
+    }
+    if (scheme == "rtmp" || scheme == "rtmps" || scheme == "rtmpt") {
+        return StreamProtocol::RTMP;
+    }
+    if (scheme == "srt") {
+        return StreamProtocol::SRT;
+    }
+    if (scheme == "http" || scheme == "https") {
+        if (path.endsWith(".m3u8")) {
+            return StreamProtocol::HLS;
+        }
+        if (path.endsWith(".mpd")) {
+            return StreamProtocol::DASH;
+        }
+        if (path.endsWith(".mjpg") || path.endsWith(".mjpeg") || uri.contains("mjpeg", Qt::CaseInsensitive)) {
+            return StreamProtocol::MJPEG;
+        }
+        return StreamProtocol::HTTP;
+    }
+    return StreamProtocol::Other;
+}
+
+QString protocolName(StreamProtocol protocol) {
+    switch (protocol) {
+    case StreamProtocol::Local:
+        return "local file";
+    case StreamProtocol::RTSP:
+        return "RTSP";
+    case StreamProtocol::RTMP:
+        return "RTMP";
+    case StreamProtocol::SRT:
+        return "SRT";
+    case StreamProtocol::HLS:
+        return "HLS";
+    case StreamProtocol::DASH:
+        return "MPEG-DASH";
+    case StreamProtocol::HTTP:
+        return "HTTP/HTTPS";
+    case StreamProtocol::MJPEG:
+        return "MJPEG";
+    case StreamProtocol::Other:
+        return "unknown";
+    }
+    return "unknown";
+}
+
+bool hasGstFeature(const char *featureName) {
+#ifndef ANDROID
+    GstRegistry *registry = gst_registry_get();
+    GstPluginFeature *feature = gst_registry_lookup_feature(registry, featureName);
+    if (!feature) {
+        return false;
+    }
+    gst_object_unref(feature);
+    return true;
+#else
+    Q_UNUSED(featureName)
+    return false;
+#endif
+}
+
+bool hasAnyGstFeature(const QStringList &featureNames) {
+    for (const QString &featureName : featureNames) {
+        if (hasGstFeature(featureName.toUtf8().constData())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasGioTlsModule() {
+    const QByteArray gioModuleDirBytes = qgetenv("GIO_MODULE_DIR");
+    if (gioModuleDirBytes.isEmpty()) {
+        return false;
+    }
+
+    const QString gioModuleDir = QString::fromLocal8Bit(gioModuleDirBytes);
+    const QStringList moduleDirs = gioModuleDir.split(QDir::listSeparator(), Qt::SkipEmptyParts);
+    for (const QString &moduleDir : moduleDirs) {
+        const QDir dir(moduleDir);
+        if (dir.exists("gioopenssl.dll") || dir.exists("giognutls.dll")) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasConfiguredGioModuleDir() {
+    return !qgetenv("GIO_MODULE_DIR").isEmpty();
+}
+
+QString protocolDependencyError(const QString &uri) {
+    const StreamProtocol protocol = detectProtocol(uri);
+    QStringList missing;
+
+    switch (protocol) {
+    case StreamProtocol::RTSP:
+        if (!hasGstFeature("rtspsrc")) {
+            missing << "rtspsrc";
+        }
+        break;
+    case StreamProtocol::RTMP:
+        if (!hasAnyGstFeature({"rtmp2src", "rtmpsrc"})) {
+            missing << "rtmp2src or rtmpsrc";
+        }
+        if (!hasGstFeature("flvdemux")) {
+            missing << "flvdemux";
+        }
+        break;
+    case StreamProtocol::SRT:
+        if (!hasAnyGstFeature({"srtsrc", "srtclientsrc", "srtserversrc"})) {
+            missing << "srtsrc, srtclientsrc, or srtserversrc";
+        }
+        break;
+    case StreamProtocol::HLS:
+        if (!hasGstFeature("souphttpsrc")) {
+            missing << "souphttpsrc";
+        }
+        if (!hasGstFeature("hlsdemux")) {
+            missing << "hlsdemux";
+        }
+        break;
+    case StreamProtocol::DASH:
+        if (!hasGstFeature("souphttpsrc")) {
+            missing << "souphttpsrc";
+        }
+        if (!hasGstFeature("dashdemux")) {
+            missing << "dashdemux";
+        }
+        break;
+    case StreamProtocol::HTTP:
+    case StreamProtocol::MJPEG:
+        if (!hasGstFeature("souphttpsrc")) {
+            missing << "souphttpsrc";
+        }
+        break;
+    default:
+        break;
+    }
+
+    const QUrl url(uri);
+    if (url.scheme().compare("https", Qt::CaseInsensitive) == 0 &&
+        hasConfiguredGioModuleDir() && !hasGioTlsModule()) {
+        missing << "GIO TLS module (gioopenssl.dll)";
+    }
+
+    if (missing.isEmpty()) {
+        return QString();
+    }
+
+    return QString("%1 playback is missing runtime dependency: %2")
+        .arg(protocolName(protocol), missing.join(", "));
+}
+
+QString enhancedPlaybackError(const QString &uri, const QString &errorMsg, const QString &debugMsg) {
+    QString result = errorMsg;
+    const QUrl url(uri);
+    const StreamProtocol protocol = detectProtocol(uri);
+
+    if (errorMsg.contains("Secure connection setup failed", Qt::CaseInsensitive) &&
+        url.scheme().compare("https", Qt::CaseInsensitive) == 0) {
+        result = QString("%1 HTTPS connection failed. Check GIO TLS module deployment and GIO_MODULE_DIR.")
+            .arg(protocolName(protocol));
+    } else if (errorMsg.contains("No URI handler", Qt::CaseInsensitive) ||
+               debugMsg.contains("No URI handler", Qt::CaseInsensitive)) {
+        const QString dependencyError = protocolDependencyError(uri);
+        if (!dependencyError.isEmpty()) {
+            result = dependencyError;
+        }
+    } else if (errorMsg.contains("Internal data stream error", Qt::CaseInsensitive)) {
+        result = QString("%1 stream error: %2").arg(protocolName(protocol), errorMsg);
+    }
+
+    return result;
+}
 
 bool isLikelyAudioOnlyUri(const QString &uri) {
     const QUrl url(uri);
@@ -82,6 +281,8 @@ GStreamerEngine::GStreamerEngine(QObject *parent)
     logFeature("flvdemux");
     logFeature("tsdemux");
     logFeature("deinterlace");
+    logFeature("srtsrc");
+    logFeature("srtclientsrc");
     logFeature("srtserversrc");
     logFeature("souphttpsrc");
     logFeature("hlsdemux");
@@ -91,6 +292,13 @@ GStreamerEngine::GStreamerEngine(QObject *parent)
     logFeature("mpg123audiodec");
     logFeature("avdec_mp3");
     logFeature("wasapi2sink");
+
+    if (hasGioTlsModule()) {
+        Logger::instance().debug(QString("GStreamerEngine: GIO TLS module available: %1")
+                                 .arg(QString::fromLocal8Bit(qgetenv("GIO_MODULE_DIR"))));
+    } else {
+        Logger::instance().warning("GStreamerEngine: GIO TLS module missing - HTTPS HLS/DASH streams may fail");
+    }
 
     Logger::instance().info("GStreamerEngine: GStreamer initialized successfully");
 #else
@@ -453,11 +661,26 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     };
 
     // Create recording branch elements:
-    // tee -> queue -> videoconvert -> x264enc -> muxer -> filesink
+    // tee -> queue -> d3d11download -> videoconvert -> x264enc -> muxer -> filesink
     recordingQueue = gst_element_factory_make("queue", "recordingqueue");
     if (!recordingQueue) {
         Logger::instance().error("GStreamerEngine: Failed to create recording queue");
         fail("Failed to create recording queue");
+        return;
+    }
+    g_object_set(G_OBJECT(recordingQueue),
+                 "max-size-buffers", 30,
+                 "max-size-bytes", 0,
+                 "max-size-time", static_cast<guint64>(500 * GST_MSECOND),
+                 "leaky", 2,
+                 nullptr);
+
+    GstElement *d3d11download = gst_element_factory_make("d3d11download", "recd3d11download");
+    if (!d3d11download) {
+        Logger::instance().error("GStreamerEngine: Failed to create d3d11download");
+        gst_object_unref(recordingQueue);
+        recordingQueue = nullptr;
+        fail("Failed to create d3d11download");
         return;
     }
 
@@ -465,6 +688,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     if (!videoconvert) {
         Logger::instance().error("GStreamerEngine: Failed to create videoconvert");
         gst_object_unref(recordingQueue);
+        gst_object_unref(d3d11download);
         recordingQueue = nullptr;
         fail("Failed to create videoconvert");
         return;
@@ -479,6 +703,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     if (!encoder) {
         Logger::instance().error("GStreamerEngine: Failed to create video encoder (x264enc or openh264enc)");
         gst_object_unref(recordingQueue);
+        gst_object_unref(d3d11download);
         gst_object_unref(videoconvert);
         recordingQueue = nullptr;
         fail("Failed to create video encoder");
@@ -488,13 +713,21 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     // Configure encoder for good quality/speed balance
     g_object_set(G_OBJECT(encoder),
                  "tune", 0x00000004,  // zerolatency
-                 "speed-preset", 2,   // superfast
+                 "speed-preset", 1,   // ultrafast
                  nullptr);
+    GObjectClass *encoderClass = G_OBJECT_GET_CLASS(encoder);
+    if (encoderClass && g_object_class_find_property(encoderClass, "key-int-max")) {
+        g_object_set(G_OBJECT(encoder), "key-int-max", 60, nullptr);
+    }
+    if (encoderClass && g_object_class_find_property(encoderClass, "bframes")) {
+        g_object_set(G_OBJECT(encoder), "bframes", 0, nullptr);
+    }
 
     muxer = gst_element_factory_make("matroskamux", "muxer");
     if (!muxer) {
         Logger::instance().error("GStreamerEngine: Failed to create muxer");
         gst_object_unref(recordingQueue);
+        gst_object_unref(d3d11download);
         gst_object_unref(videoconvert);
         gst_object_unref(encoder);
         recordingQueue = nullptr;
@@ -506,6 +739,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     if (!fileSink) {
         Logger::instance().error("GStreamerEngine: Failed to create filesink");
         gst_object_unref(recordingQueue);
+        gst_object_unref(d3d11download);
         gst_object_unref(videoconvert);
         gst_object_unref(encoder);
         gst_object_unref(muxer);
@@ -516,14 +750,21 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     }
 
     g_object_set(G_OBJECT(fileSink), "location", filepath.toStdString().c_str(), nullptr);
+    GObjectClass *fileSinkClass = G_OBJECT_GET_CLASS(fileSink);
+    if (fileSinkClass && g_object_class_find_property(fileSinkClass, "async")) {
+        g_object_set(G_OBJECT(fileSink), "async", FALSE, nullptr);
+    }
+    if (fileSinkClass && g_object_class_find_property(fileSinkClass, "sync")) {
+        g_object_set(G_OBJECT(fileSink), "sync", FALSE, nullptr);
+    }
 
     // Add all elements to videoSinkBin (where tee lives)
-    gst_bin_add_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+    gst_bin_add_many(GST_BIN(videoSinkBin), recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr);
 
-    // Link recording branch: queue -> videoconvert -> encoder -> muxer -> filesink
-    if (!gst_element_link_many(recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr)) {
+    // Link recording branch: queue -> d3d11download -> videoconvert -> encoder -> muxer -> filesink
+    if (!gst_element_link_many(recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr)) {
         Logger::instance().error("GStreamerEngine: Failed to link recording elements");
-        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -535,7 +776,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
     GstPad *teeSrcPad = gst_element_request_pad_simple(tee, "src_%u");
     if (!teeSrcPad) {
         Logger::instance().error("GStreamerEngine: Failed to get tee src pad");
-        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -548,7 +789,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         Logger::instance().error("GStreamerEngine: Failed to get queue sink pad");
         gst_element_release_request_pad(tee, teeSrcPad);
         gst_object_unref(teeSrcPad);
-        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -567,7 +808,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
         gst_element_release_request_pad(tee, teeSrcPad);
         gst_object_unref(teeSrcPad);
         recordingTeePad = nullptr;
-        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, videoconvert, encoder, muxer, fileSink, nullptr);
+        gst_bin_remove_many(GST_BIN(videoSinkBin), recordingQueue, d3d11download, videoconvert, encoder, muxer, fileSink, nullptr);
         recordingQueue = nullptr;
         muxer = nullptr;
         fileSink = nullptr;
@@ -577,6 +818,7 @@ void GStreamerEngine::doStartRecording(const QString &filepath) {
 
     // Sync state with parent pipeline
     gst_element_sync_state_with_parent(recordingQueue);
+    gst_element_sync_state_with_parent(d3d11download);
     gst_element_sync_state_with_parent(videoconvert);
     gst_element_sync_state_with_parent(encoder);
     gst_element_sync_state_with_parent(muxer);
@@ -623,6 +865,7 @@ void GStreamerEngine::doStopRecording() {
 
     // Get all recording elements by name and remove them
     GstElement *recQueue = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recordingqueue");
+    GstElement *recD3d11Download = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recd3d11download");
     GstElement *recVideoConvert = gst_bin_get_by_name(GST_BIN(videoSinkBin), "recvideoconvert");
     GstElement *recEncoder = gst_bin_get_by_name(GST_BIN(videoSinkBin), "encoder");
     GstElement *recMuxer = gst_bin_get_by_name(GST_BIN(videoSinkBin), "muxer");
@@ -633,6 +876,11 @@ void GStreamerEngine::doStopRecording() {
         gst_element_set_state(recQueue, GST_STATE_NULL);
         gst_bin_remove(GST_BIN(videoSinkBin), recQueue);
         gst_object_unref(recQueue);
+    }
+    if (recD3d11Download) {
+        gst_element_set_state(recD3d11Download, GST_STATE_NULL);
+        gst_bin_remove(GST_BIN(videoSinkBin), recD3d11Download);
+        gst_object_unref(recD3d11Download);
     }
     if (recVideoConvert) {
         gst_element_set_state(recVideoConvert, GST_STATE_NULL);
@@ -1124,8 +1372,16 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
         gchar *debug = nullptr;
         gst_message_parse_error(msg, &err, &debug);
         QString errorMsg = QString::fromUtf8(err->message);
+        const QString debugMsg = debug ? QString::fromUtf8(debug) : QString();
+        const QString userErrorMsg = enhancedPlaybackError(currentUri, errorMsg, debugMsg);
         Logger::instance().error(QString("GStreamerEngine: Pipeline error: %1").arg(errorMsg));
-        emit errorOccurred(errorMsg);
+        if (!debugMsg.isEmpty()) {
+            Logger::instance().debug(QString("GStreamerEngine: Pipeline error detail: %1").arg(debugMsg));
+        }
+        if (userErrorMsg != errorMsg) {
+            Logger::instance().warning(QString("GStreamerEngine: Enhanced playback error: %1").arg(userErrorMsg));
+        }
+        emit errorOccurred(userErrorMsg);
         g_error_free(err);
         g_free(debug);
         currentState = PlayerState::Error;
@@ -1155,13 +1411,9 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     case GST_MESSAGE_BUFFERING: {
         gint percent = 0;
         gst_message_parse_buffering(msg, &percent);
-        if (pipeline && currentState == PlayerState::Playing) {
-            if (percent < 100) {
-                gst_element_set_state(pipeline, GST_STATE_PAUSED);
-            } else {
-                gst_element_set_state(pipeline, GST_STATE_PLAYING);
-                refreshStreamInfoFromSink();
-            }
+        if (pipeline && currentState != PlayerState::Playing && percent >= 100) {
+            gst_element_set_state(pipeline, GST_STATE_PLAYING);
+            refreshStreamInfoFromSink();
         }
         Logger::instance().debug(QString("GStreamerEngine: buffering %1%").arg(percent));
         break;
@@ -1262,6 +1514,15 @@ void GStreamerEngine::extractStreamInfo(void *caps) {
 void GStreamerEngine::setupPipeline(const QString &uri) {
 #ifndef ANDROID
     Logger::instance().info(QString("GStreamerEngine: Setting up pipeline for: %1").arg(uri));
+
+    const QString dependencyError = protocolDependencyError(uri);
+    if (!dependencyError.isEmpty()) {
+        Logger::instance().error(QString("GStreamerEngine: %1").arg(dependencyError));
+        currentState = PlayerState::Error;
+        emit errorOccurred(dependencyError);
+        emit stateChanged(currentState);
+        return;
+    }
 
     // Create playbin3 element directly (not via gst_parse_launch)
     pipeline = gst_element_factory_make("playbin3", "playbin");
@@ -1532,16 +1793,6 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
-
-
-
-
-
-
-
-
-
-
 
 
 
