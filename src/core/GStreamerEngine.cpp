@@ -50,6 +50,10 @@ GStreamerEngine::GStreamerEngine(QObject *parent)
     : QObject(parent)
 {
 #ifndef ANDROID
+    busPollTimer = new QTimer(this);
+    busPollTimer->setInterval(20);
+    connect(busPollTimer, &QTimer::timeout, this, &GStreamerEngine::pollBusMessages);
+
     Logger::instance().info("GStreamerEngine: Initializing GStreamer...");
     gst_init(nullptr, nullptr);
 
@@ -74,6 +78,14 @@ GStreamerEngine::GStreamerEngine(QObject *parent)
     };
     logFeature("rtspsrc");
     logFeature("rtspsrcdemux");
+    logFeature("rtmp2src");
+    logFeature("flvdemux");
+    logFeature("tsdemux");
+    logFeature("deinterlace");
+    logFeature("srtserversrc");
+    logFeature("souphttpsrc");
+    logFeature("hlsdemux");
+    logFeature("dashdemux");
     logFeature("rtpmpadepay");
     logFeature("mpegaudioparse");
     logFeature("mpg123audiodec");
@@ -1028,6 +1040,40 @@ void GStreamerEngine::handleNetworkBuffer(GstPad *pad, GstBuffer *buffer) {
     networkStatsByteCount = 0;
 }
 
+void GStreamerEngine::startBusPolling() {
+    if (!pipeline) {
+        return;
+    }
+
+    stopBusPolling();
+    messageBus = gst_element_get_bus(pipeline);
+    if (busPollTimer && messageBus) {
+        busPollTimer->start();
+        Logger::instance().debug("GStreamerEngine: Bus polling started");
+    }
+}
+
+void GStreamerEngine::stopBusPolling() {
+    if (busPollTimer) {
+        busPollTimer->stop();
+    }
+    if (messageBus) {
+        gst_object_unref(messageBus);
+        messageBus = nullptr;
+    }
+}
+
+void GStreamerEngine::pollBusMessages() {
+    if (!messageBus) {
+        return;
+    }
+
+    while (GstMessage *msg = gst_bus_pop(messageBus)) {
+        handleBusMessage(msg);
+        gst_message_unref(msg);
+    }
+}
+
 void GStreamerEngine::updateLocalFileBitrateEstimate() {
     const QUrl url(currentUri);
     if (!url.isLocalFile() || streamInfo.bitrate > 0) {
@@ -1095,11 +1141,29 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
     case GST_MESSAGE_STATE_CHANGED: {
         GstState oldState, newState, pendingState;
         gst_message_parse_state_changed(msg, &oldState, &newState, &pendingState);
-        if (GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline) && newState == GST_STATE_PLAYING) {
-            refreshStreamInfoFromSink();
+        if (GST_MESSAGE_SRC(msg) == GST_OBJECT(pipeline)) {
+            Logger::instance().debug(QString("GStreamerEngine: pipeline state %1 -> %2 pending=%3")
+                                     .arg(gst_element_state_get_name(oldState))
+                                     .arg(gst_element_state_get_name(newState))
+                                     .arg(gst_element_state_get_name(pendingState)));
+            if (newState == GST_STATE_PLAYING) {
+                refreshStreamInfoFromSink();
+            }
         }
-        Q_UNUSED(oldState)
-        Q_UNUSED(pendingState)
+        break;
+    }
+    case GST_MESSAGE_BUFFERING: {
+        gint percent = 0;
+        gst_message_parse_buffering(msg, &percent);
+        if (pipeline && currentState == PlayerState::Playing) {
+            if (percent < 100) {
+                gst_element_set_state(pipeline, GST_STATE_PAUSED);
+            } else {
+                gst_element_set_state(pipeline, GST_STATE_PLAYING);
+                refreshStreamInfoFromSink();
+            }
+        }
+        Logger::instance().debug(QString("GStreamerEngine: buffering %1%").arg(percent));
         break;
     }
     case GST_MESSAGE_ASYNC_DONE:
@@ -1265,18 +1329,19 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
             volumeElement = nullptr;
         }
 
-        GstBus *bus = gst_element_get_bus(pipeline);
-        gst_bus_add_watch(bus, busCallback, this);
-        gst_object_unref(bus);
-        Logger::instance().debug("GStreamerEngine: Bus watch added");
+        startBusPolling();
         return;
     }
 
-    // Build video sink bin: tee ! queue ! d3d11videosink
-    // Keep conversion out of the display hot path to reduce CPU-induced stutter.
+    // Build video sink bin: tee ! queue ! converter ! d3d11videosink.
+    // Adaptive streams can expose formats/memory types that need conversion before D3D11 display.
     videoSinkBin = gst_bin_new("videosinkbin");
     tee = gst_element_factory_make("tee", "t");
     GstElement *queue = gst_element_factory_make("queue", "displayqueue");
+    GstElement *displayConvert = gst_element_factory_make("d3d11convert", "displayconvert");
+    if (!displayConvert) {
+        displayConvert = gst_element_factory_make("videoconvert", "displayconvert");
+    }
     videoSink = gst_element_factory_make("d3d11videosink", "videosink");
     audioSinkBin = gst_bin_new("audiosinkbin");
     volumeElement = gst_element_factory_make("volume", "audiovolume");
@@ -1287,7 +1352,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         audioSink = gst_element_factory_make("autoaudiosink", "audiosink");
     }
 
-    if (!tee || !queue || !videoSink || !audioSinkBin || !volumeElement || !audioConvert || !audioResample || !audioSink) {
+    if (!tee || !queue || !displayConvert || !videoSink || !audioSinkBin || !volumeElement || !audioConvert || !audioResample || !audioSink) {
         Logger::instance().error("GStreamerEngine: Failed to create video sink elements");
         emit errorOccurred("Failed to create video sink elements");
         gst_object_unref(pipeline);
@@ -1296,6 +1361,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
         videoSink = nullptr;
         if (tee) gst_object_unref(tee);
         if (queue) gst_object_unref(queue);
+        if (displayConvert) gst_object_unref(displayConvert);
         if (videoSink) gst_object_unref(videoSink);
         if (audioSinkBin) gst_object_unref(audioSinkBin);
         if (volumeElement) gst_object_unref(volumeElement);
@@ -1322,11 +1388,12 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
                  nullptr);
     setStretchVideo(stretchVideoEnabled);
 
-    gst_bin_add_many(GST_BIN(videoSinkBin), tee, queue, videoSink, nullptr);
+    gst_bin_add_many(GST_BIN(videoSinkBin), tee, queue, displayConvert, videoSink, nullptr);
     g_object_set(G_OBJECT(volumeElement), "volume", currentVolume / 100.0, nullptr);
     gst_bin_add_many(GST_BIN(audioSinkBin), volumeElement, audioConvert, audioResample, audioSink, nullptr);
     if (!gst_element_link(tee, queue) ||
-        !gst_element_link(queue, videoSink) ||
+        !gst_element_link(queue, displayConvert) ||
+        !gst_element_link(displayConvert, videoSink) ||
         !gst_element_link_many(volumeElement, audioConvert, audioResample, audioSink, nullptr)) {
         Logger::instance().error("GStreamerEngine: Failed to link video sink elements");
         emit errorOccurred("Failed to link video sink elements");
@@ -1387,11 +1454,7 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
     Logger::instance().info("GStreamerEngine: Pipeline created successfully");
 
-    // Setup bus
-    GstBus *bus = gst_element_get_bus(pipeline);
-    gst_bus_add_watch(bus, busCallback, this);
-    gst_object_unref(bus);
-    Logger::instance().debug("GStreamerEngine: Bus watch added");
+    startBusPolling();
 #else
     (void)uri;
 #endif
@@ -1399,6 +1462,8 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
 
 void GStreamerEngine::cleanupPipeline() {
 #ifndef ANDROID
+    stopBusPolling();
+
     if (isRecordingActive) {
         stopRecording();
     }
@@ -1467,15 +1532,6 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
-
-
-
-
-
-
-
-
-
 
 
 

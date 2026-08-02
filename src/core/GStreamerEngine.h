@@ -14,6 +14,7 @@
 #include <QString>
 #include <QWindow>
 #include <QImage>
+#include <QTimer>
 #include <QtGlobal>
 
 #ifndef ANDROID
@@ -93,6 +94,9 @@ private:
     void handleNetworkBuffer(GstPad *pad, GstBuffer *buffer);
     void updateLocalFileBitrateEstimate();
     void extractStreamInfo(GstCaps *caps);
+    void startBusPolling();
+    void stopBusPolling();
+    void pollBusMessages();
     void doStartRecording(const QString &filepath);
     void doStopRecording();
 #else
@@ -114,11 +118,13 @@ private:
     GstElement *fileSink = nullptr;
     GstElement *recordingQueue = nullptr;
     GstElement *muxer = nullptr;
+    GstBus *messageBus = nullptr;
     GstPad *recordingTeePad = nullptr;
     GstPad *videoProbePad = nullptr;
     GstPad *networkProbePad = nullptr;
     gulong videoProbeId = 0;
     gulong networkProbeId = 0;
+    QTimer *busPollTimer = nullptr;
     GstClockTime statsWindowStartNs = 0;
     GstClockTime statsLastLogNs = 0;
     quint64 statsFrameCount = 0;
@@ -160,6 +166,5 @@ private:
 };
 
 #endif // GSTREAMER_ENGINE_H
-
 
 

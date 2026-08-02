@@ -113,6 +113,7 @@ REM Video plugins
 copy "%GST_PLUGINS%\gstvideoconvertscale.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstvideoparsersbad.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstvideorate.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstdeinterlace.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstd3d11.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 
 REM Codec plugins
@@ -125,6 +126,8 @@ REM Container plugins
 copy "%GST_PLUGINS%\gstisomp4.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstmatroska.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstavi.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstflv.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstmpegtsdemux.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 
 REM Network plugins
 copy "%GST_PLUGINS%\gstrtsp.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
@@ -133,6 +136,14 @@ copy "%GST_PLUGINS%\gstrtpmanager.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstudp.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gsttcp.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstsdpelem.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstrtmp2.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstsrt.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstsoup.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+
+REM Adaptive streaming plugins
+copy "%GST_PLUGINS%\gsthls.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstdash.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+copy "%GST_PLUGINS%\gstadaptivedemux2.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 
 REM Audio plugins
 copy "%GST_PLUGINS%\gstaudioconvert.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
@@ -144,6 +155,13 @@ copy "%GST_PLUGINS%\gstopus.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstopusparse.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstwasapi2.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
 copy "%GST_PLUGINS%\gstvolume.dll" "%EXE_PATH%\lib\gstreamer-1.0\" >nul 2>&1
+
+REM GIO TLS modules are required by souphttpsrc for HTTPS HLS/DASH streams.
+if exist "%GSTREAMER_PATH%\lib\gio\modules" (
+    echo Copying GIO modules...
+    if not exist "%EXE_PATH%\lib\gio\modules" mkdir "%EXE_PATH%\lib\gio\modules"
+    copy "%GSTREAMER_PATH%\lib\gio\modules\*.dll" "%EXE_PATH%\lib\gio\modules\" >nul 2>&1
+)
 
 if not exist "%EXE_PATH%\Qt6Core.dll" (
     echo Warning: Qt6Core.dll not found in output folder.

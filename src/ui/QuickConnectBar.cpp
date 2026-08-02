@@ -55,7 +55,7 @@ void QuickConnectBar::setupUI() {
     // URI input
     uriInput = new QLineEdit();
     uriInput->setMinimumHeight(50);
-    uriInput->setPlaceholderText(tr("Enter stream URL (rtsp://, udp://, http://...) and press Enter"));
+    uriInput->setPlaceholderText(tr("Enter stream URL (RTSP, RTMP, SRT, HLS, DASH, HTTP) and press Enter"));
     layout->addWidget(uriInput, 1);
 
     // Settings button
@@ -143,7 +143,7 @@ void QuickConnectBar::setLocalMode(bool localMode) {
         uriInput->setPlaceholderText(tr("Local mode: select files from the local file list"));
     } else {
         uriInput->setReadOnly(false);
-        uriInput->setPlaceholderText(tr("Enter stream URL (rtsp://, udp://, http://...) and press Enter"));
+        uriInput->setPlaceholderText(tr("Enter stream URL (RTSP, RTMP, SRT, HLS, DASH, HTTP) and press Enter"));
         if (uriInput->text().trimmed().isEmpty() && !lastStreamUri.isEmpty()) {
             uriInput->setText(lastStreamUri);
         }

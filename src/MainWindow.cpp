@@ -57,7 +57,9 @@ bool isValidStreamUri(const QString &uri) {
 
     const QString scheme = url.scheme().toLower();
     return scheme == "rtsp" || scheme == "udp" || scheme == "tcp" ||
-           scheme == "http" || scheme == "https" || scheme == "file";
+           scheme == "http" || scheme == "https" ||
+           scheme == "rtmp" || scheme == "rtmps" || scheme == "rtmpt" ||
+           scheme == "srt" || scheme == "file";
 }
 }
 

@@ -1,6 +1,6 @@
 # HywelStar Player
 
-A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP streams and local video files.
+A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP, SRT, HLS, DASH, HTTP streams and local video files.
 
 <img width="1280" height="750" alt="image" src="https://github.com/user-attachments/assets/fe442e40-af6e-4d13-9d31-4e4bacb46fae" />
 
@@ -22,7 +22,12 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 |---------|--------|-------|
 | RTSP Stream Playback | Done | H.264/H.265 |
 | UDP Stream Playback | Done | H.264/H.265 |
-| HTTP/HTTPS Playback | Done | - |
+| TCP Stream Playback | Done | Basic URI support |
+| RTMP/RTMPS Playback | Done | URI recognition and playbin3 playback |
+| SRT Playback | Done | URI recognition and playbin3 playback |
+| HLS Playback | Done | HTTP/HTTPS `.m3u8` |
+| MPEG-DASH Playback | Done | HTTP/HTTPS `.mpd` |
+| HTTP/HTTPS Playback | Done | Progressive streams and MJPEG URLs |
 | Local File Playback | Done | MP4, MKV, AVI, etc. |
 | Stream/Local Mode Switch | Done | Separate stream URL and local playback workflows |
 | Local Playlist | Done | File/folder selection, persisted file list |
@@ -30,11 +35,13 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, HTTP strea
 | Playback Progress Overlay | Done | In-video progress bar with seek, auto-hide |
 | Playback Speed Control | Done | 0.5x - 2x |
 | Fit/Stretch Display | Done | Aspect fit or stretch toggle |
+| Bitrate Display | Done | Local average bitrate and RTSP RTP video bitrate |
 | Video Recording | Done | MKV format |
 | Screenshot | Done | PNG format |
 | Grid Overlay | Done | For positioning |
 | Fullscreen Mode | Done | F key / double-click |
 | Volume Control | Done | Slider + mute |
+| Theme Selection | Done | System, Light, Dark |
 | Settings Persistence | Done | Window size, stream URI, volume, mode, loop settings |
 | Recording Timer | Done | Real-time display |
 | Menu Bar | Done | Top menu |
@@ -151,6 +158,14 @@ deploy_windows.bat Release
 | Drag progress bar | Seek local/media playback |
 | Double-click | Toggle fullscreen |
 
+## Playback Modes and Display
+
+- **Stream mode**: enter RTSP/UDP/TCP/RTMP/SRT/HLS/DASH/HTTP/HTTPS URLs in the top bar.
+- **Local mode**: select files or folders from the local playlist.
+- **Local playback end behavior**: choose Play Once, Loop One, or Loop All.
+- **Bitrate display**: local files show average media bitrate; RTSP streams show measured RTP video bitrate when available.
+- **Theme**: choose System, Light, or Dark from Settings.
+
 ## Project Structure
 
 ```text
@@ -167,8 +182,9 @@ HywelStarPlayer/
 |   |-- main.cpp
 |   |-- MainWindow.cpp/h
 |   |-- core/               # GStreamer engine, recording
-|   |-- ui/                 # UI components
-|   |   `-- LocalFileListWidget.cpp/h
+|   |-- ui/                 # UI components and themes
+|   |   |-- LocalFileListWidget.cpp/h
+|   |   `-- ThemeManager.cpp/h
 |   `-- utils/              # Logger, stream parser
 |-- resources/
 |   |-- resources.qrc
@@ -190,6 +206,7 @@ HywelStarPlayer/
 - Fixed bitrate reporting for local files and RTSP video streams.
 - Added System/Light/Dark theme support and improved dark theme readability.
 - Fixed fullscreen playback so the menu bar is hidden in immersive mode.
+- Added first-phase stream protocol recognition for RTMP, SRT, HLS, DASH, and MJPEG URLs.
 
 ### v1.1.0 (Released 2026-05-08)
 - Added Stream/Local mode switching in the top bar.

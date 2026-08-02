@@ -17,6 +17,10 @@ enum class StreamType {
     UDP,
     TCP,
     HTTP,
+    RTMP,
+    SRT,
+    HLS,
+    DASH,
     MJPEG,
     UVC,
     Unknown

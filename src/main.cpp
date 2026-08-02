@@ -41,6 +41,11 @@ void setupGStreamerEnv() {
         qputenv("GST_PLUGIN_PATH_1_0", pluginDir.toUtf8().constData());
         qputenv("GST_PLUGIN_PATH", pluginDir.toUtf8().constData());
     }
+
+    const QString gioModuleDir = QDir(appDir).filePath("lib/gio/modules");
+    if (QFileInfo::exists(gioModuleDir)) {
+        qputenv("GIO_MODULE_DIR", QDir::toNativeSeparators(gioModuleDir).toUtf8().constData());
+    }
 #endif
 }
 
@@ -66,6 +71,7 @@ int main(int argc, char *argv[]) {
     Logger::instance().info(QString("Architecture: %1").arg(QSysInfo::currentCpuArchitecture()));
 #ifdef Q_OS_WIN
     Logger::instance().info(QString("GST_PLUGIN_PATH: %1").arg(qgetenv("GST_PLUGIN_PATH").constData()));
+    Logger::instance().info(QString("GIO_MODULE_DIR: %1").arg(qgetenv("GIO_MODULE_DIR").constData()));
 #endif
     Logger::instance().info("===========================================");
 
