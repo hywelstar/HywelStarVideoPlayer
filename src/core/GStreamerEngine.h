@@ -85,8 +85,13 @@ private:
 #ifndef ANDROID
     static gboolean busCallback(GstBus *bus, GstMessage *msg, gpointer data);
     static GstPadProbeReturn videoProbeCallback(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
+    static void sourceSetupCallback(GstElement *playbin, GstElement *source, gpointer user_data);
+    static void rtpPadAddedCallback(GstElement *source, GstPad *pad, gpointer user_data);
+    static GstPadProbeReturn networkProbeCallback(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
     void handleBusMessage(GstMessage *msg);
     void handleVideoBuffer(GstPad *pad, GstBuffer *buffer);
+    void handleNetworkBuffer(GstPad *pad, GstBuffer *buffer);
+    void updateLocalFileBitrateEstimate();
     void extractStreamInfo(GstCaps *caps);
     void doStartRecording(const QString &filepath);
     void doStopRecording();
@@ -111,7 +116,9 @@ private:
     GstElement *muxer = nullptr;
     GstPad *recordingTeePad = nullptr;
     GstPad *videoProbePad = nullptr;
+    GstPad *networkProbePad = nullptr;
     gulong videoProbeId = 0;
+    gulong networkProbeId = 0;
     GstClockTime statsWindowStartNs = 0;
     GstClockTime statsLastLogNs = 0;
     quint64 statsFrameCount = 0;
@@ -124,6 +131,9 @@ private:
     quint64 qosLastDropped = 0;
     quint64 qosProcessedTotal = 0;
     quint64 qosDroppedTotal = 0;
+    GstClockTime networkStatsWindowStartNs = 0;
+    GstClockTime networkStatsLastLogNs = 0;
+    quint64 networkStatsByteCount = 0;
 #else
     void *pipeline = nullptr;
     void *videoSink = nullptr;
@@ -150,7 +160,6 @@ private:
 };
 
 #endif // GSTREAMER_ENGINE_H
-
 
 
 

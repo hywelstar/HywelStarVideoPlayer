@@ -192,6 +192,7 @@ HywelStarPlayer/
 - Added in-video progress overlay with seek and auto-hide behavior.
 - Added playback speed and fit/stretch display controls.
 - Improved fullscreen and video overlay refresh behavior.
+- Fixed playback volume control with mute/unmute support and a louder default volume.
 - Updated Windows build script with `--help` and automatic retry when the executable is in use.
 
 ### v1.0.0 (Released 2026-04-26)

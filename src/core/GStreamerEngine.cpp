@@ -12,8 +12,10 @@
 #include <QDebug>
 #include <QUrl>
 #include <QFile>
+#include <QFileInfo>
 #include <QStringList>
 #include <QtGlobal>
+#include <limits>
 
 #ifndef ANDROID
 #include <gst/app/gstappsink.h>
@@ -836,6 +838,80 @@ GstPadProbeReturn GStreamerEngine::videoProbeCallback(GstPad *pad, GstPadProbeIn
     engine->handleVideoBuffer(pad, buffer);
     return GST_PAD_PROBE_OK;
 }
+
+void GStreamerEngine::sourceSetupCallback(GstElement *playbin, GstElement *source, gpointer user_data) {
+    Q_UNUSED(playbin)
+    GStreamerEngine *engine = static_cast<GStreamerEngine *>(user_data);
+    if (!engine || !source) {
+        return;
+    }
+
+    const gchar *sourceName = GST_OBJECT_NAME(source);
+    Logger::instance().debug(QString("GStreamerEngine: source setup: %1")
+                             .arg(sourceName ? QString::fromUtf8(sourceName) : QString("unknown")));
+    g_signal_connect(source, "pad-added", G_CALLBACK(GStreamerEngine::rtpPadAddedCallback), engine);
+}
+
+void GStreamerEngine::rtpPadAddedCallback(GstElement *source, GstPad *pad, gpointer user_data) {
+    Q_UNUSED(source)
+    GStreamerEngine *engine = static_cast<GStreamerEngine *>(user_data);
+    if (!engine || !pad || engine->networkProbePad) {
+        return;
+    }
+
+    GstCaps *caps = gst_pad_get_current_caps(pad);
+    if (!caps) {
+        caps = gst_pad_query_caps(pad, nullptr);
+    }
+    if (!caps || gst_caps_is_empty(caps)) {
+        if (caps) {
+            gst_caps_unref(caps);
+        }
+        return;
+    }
+
+    bool isVideoRtp = false;
+    GstStructure *structure = gst_caps_get_structure(caps, 0);
+    if (structure && gst_structure_has_name(structure, "application/x-rtp")) {
+        const gchar *media = gst_structure_get_string(structure, "media");
+        isVideoRtp = media && g_strcmp0(media, "video") == 0;
+    }
+    gst_caps_unref(caps);
+
+    if (!isVideoRtp) {
+        return;
+    }
+
+    engine->networkProbePad = GST_PAD(gst_object_ref(pad));
+    engine->networkProbeId = gst_pad_add_probe(pad,
+                                               GST_PAD_PROBE_TYPE_BUFFER,
+                                               GStreamerEngine::networkProbeCallback,
+                                               engine,
+                                               nullptr);
+    engine->networkStatsWindowStartNs = 0;
+    engine->networkStatsLastLogNs = 0;
+    engine->networkStatsByteCount = 0;
+    Logger::instance().info("GStreamerEngine: RTSP video RTP bitrate probe attached");
+}
+
+GstPadProbeReturn GStreamerEngine::networkProbeCallback(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    if (!user_data || !info) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    if ((GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER) == 0) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    GstBuffer *buffer = gst_pad_probe_info_get_buffer(info);
+    if (!buffer) {
+        return GST_PAD_PROBE_OK;
+    }
+
+    GStreamerEngine *engine = static_cast<GStreamerEngine *>(user_data);
+    engine->handleNetworkBuffer(pad, buffer);
+    return GST_PAD_PROBE_OK;
+}
 #else
 int GStreamerEngine::busCallback(void *bus, void *msg, void *data) {
     (void)bus;
@@ -858,7 +934,6 @@ void GStreamerEngine::handleVideoBuffer(GstPad *pad, GstBuffer *buffer) {
     }
 
     statsFrameCount += 1;
-    statsByteCount += gst_buffer_get_size(buffer);
 
     const GstClockTime nowNs = gst_util_get_timestamp();
     if (frameLastArrivalNs != 0 && nowNs > frameLastArrivalNs) {
@@ -883,12 +958,9 @@ void GStreamerEngine::handleVideoBuffer(GstPad *pad, GstBuffer *buffer) {
     }
 
     int measuredFps = static_cast<int>((static_cast<double>(statsFrameCount) / elapsedSeconds) + 0.5);
-    int measuredBitrate = static_cast<int>((static_cast<double>(statsByteCount) * 8.0) / elapsedSeconds);
 
     streamInfo.fps = measuredFps;
-    if (measuredBitrate > 0) {
-        streamInfo.bitrate = measuredBitrate;
-    }
+    updateLocalFileBitrateEstimate();
 
     emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
 
@@ -897,7 +969,7 @@ void GStreamerEngine::handleVideoBuffer(GstPad *pad, GstBuffer *buffer) {
 
     if (statsLastLogNs == 0 || (nowNs - statsLastLogNs) >= (5 * GST_SECOND)) {
         const double maxGapMs = static_cast<double>(frameGapMaxNs) / static_cast<double>(GST_MSECOND);
-        const QString statsLine = QString("GStreamerEngine: stream stats fps=%1 bitrate=%2 kbps latency=%3 ms max_gap=%4 ms gap_spikes=%5")
+        const QString statsLine = QString("GStreamerEngine: display stats fps=%1 bitrate=%2 kbps latency=%3 ms max_gap=%4 ms gap_spikes=%5")
                                   .arg(streamInfo.fps)
                                   .arg(streamInfo.bitrate / 1000)
                                   .arg(networkLatencyMs)
@@ -912,6 +984,72 @@ void GStreamerEngine::handleVideoBuffer(GstPad *pad, GstBuffer *buffer) {
     statsByteCount = 0;
     frameGapMaxNs = 0;
     frameGapSpikeCount = 0;
+}
+
+void GStreamerEngine::handleNetworkBuffer(GstPad *pad, GstBuffer *buffer) {
+    Q_UNUSED(pad)
+    if (!buffer) {
+        return;
+    }
+
+    if (networkStatsWindowStartNs == 0) {
+        networkStatsWindowStartNs = gst_util_get_timestamp();
+        networkStatsByteCount = 0;
+    }
+
+    networkStatsByteCount += gst_buffer_get_size(buffer);
+
+    const GstClockTime nowNs = gst_util_get_timestamp();
+    const GstClockTime elapsedNs = nowNs - networkStatsWindowStartNs;
+    if (elapsedNs < GST_SECOND) {
+        return;
+    }
+
+    const double elapsedSeconds = static_cast<double>(elapsedNs) / static_cast<double>(GST_SECOND);
+    if (elapsedSeconds <= 0.0) {
+        return;
+    }
+
+    const int measuredBitrate = static_cast<int>(
+        qMin<double>((static_cast<double>(networkStatsByteCount) * 8.0) / elapsedSeconds,
+                     static_cast<double>(std::numeric_limits<int>::max())));
+    if (measuredBitrate > 0) {
+        streamInfo.bitrate = measuredBitrate;
+        emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
+    }
+
+    if (networkStatsLastLogNs == 0 || (nowNs - networkStatsLastLogNs) >= (5 * GST_SECOND)) {
+        Logger::instance().debug(QString("GStreamerEngine: network video bitrate=%1 kbps")
+                                 .arg(streamInfo.bitrate / 1000));
+        networkStatsLastLogNs = nowNs;
+    }
+
+    networkStatsWindowStartNs = nowNs;
+    networkStatsByteCount = 0;
+}
+
+void GStreamerEngine::updateLocalFileBitrateEstimate() {
+    const QUrl url(currentUri);
+    if (!url.isLocalFile() || streamInfo.bitrate > 0) {
+        return;
+    }
+
+    const QFileInfo fileInfo(url.toLocalFile());
+    const qint64 duration = durationMs();
+    if (!fileInfo.exists() || fileInfo.size() <= 0 || duration <= 0) {
+        return;
+    }
+
+    const double seconds = static_cast<double>(duration) / 1000.0;
+    const int estimatedBitrate = static_cast<int>(
+        qMin<double>((static_cast<double>(fileInfo.size()) * 8.0) / seconds,
+                     static_cast<double>(std::numeric_limits<int>::max())));
+    if (estimatedBitrate > 0) {
+        streamInfo.bitrate = estimatedBitrate;
+        emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
+        Logger::instance().debug(QString("GStreamerEngine: local average bitrate=%1 kbps")
+                                 .arg(streamInfo.bitrate / 1000));
+    }
 }
 
 void GStreamerEngine::handleBusMessage(GstMessage *msg) {
@@ -931,6 +1069,7 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
             gst_caps_unref(caps);
         }
         gst_object_unref(sinkPad);
+        updateLocalFileBitrateEstimate();
     };
 
     switch (GST_MESSAGE_TYPE(msg)) {
@@ -1006,7 +1145,7 @@ void GStreamerEngine::handleBusMessage(GstMessage *msg) {
         gst_message_parse_tag(msg, &tags);
         if (tags) {
             guint bitrate = 0;
-            if (gst_tag_list_get_uint(tags, GST_TAG_BITRATE, &bitrate) && bitrate > 0) {
+            if (gst_tag_list_get_uint(tags, GST_TAG_BITRATE, &bitrate) && bitrate > 0 && streamInfo.bitrate <= 0) {
                 streamInfo.bitrate = static_cast<int>(bitrate);
                 emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
             }
@@ -1047,7 +1186,6 @@ void GStreamerEngine::extractStreamInfo(GstCaps *caps) {
     streamInfo.width = width;
     streamInfo.height = height;
     streamInfo.fps = fps_den > 0 ? fps_num / fps_den : 0;
-    streamInfo.bitrate = 0; // Will be updated from other sources
 
     emit streamInfoChanged(streamInfo.width, streamInfo.height, streamInfo.fps, streamInfo.bitrate);
 }
@@ -1076,6 +1214,11 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     // Set URI
     g_object_set(pipeline, "uri", uri.toStdString().c_str(), nullptr);
     g_object_set(G_OBJECT(pipeline), "volume", currentVolume / 100.0, nullptr);
+    g_signal_connect(pipeline, "source-setup", G_CALLBACK(GStreamerEngine::sourceSetupCallback), this);
+    streamInfo = StreamInfo();
+    networkStatsWindowStartNs = 0;
+    networkStatsLastLogNs = 0;
+    networkStatsByteCount = 0;
 
     GObjectClass *klass = G_OBJECT_GET_CLASS(pipeline);
     if (klass && g_object_class_find_property(klass, "latency")) {
@@ -1238,6 +1381,9 @@ void GStreamerEngine::setupPipeline(const QString &uri) {
     qosLastDropped = 0;
     qosProcessedTotal = 0;
     qosDroppedTotal = 0;
+    networkStatsWindowStartNs = 0;
+    networkStatsLastLogNs = 0;
+    networkStatsByteCount = 0;
 
     Logger::instance().info("GStreamerEngine: Pipeline created successfully");
 
@@ -1265,6 +1411,14 @@ void GStreamerEngine::cleanupPipeline() {
         gst_object_unref(videoProbePad);
         videoProbePad = nullptr;
     }
+    if (networkProbePad) {
+        if (networkProbeId != 0) {
+            gst_pad_remove_probe(networkProbePad, networkProbeId);
+            networkProbeId = 0;
+        }
+        gst_object_unref(networkProbePad);
+        networkProbePad = nullptr;
+    }
     statsWindowStartNs = 0;
     statsLastLogNs = 0;
     statsFrameCount = 0;
@@ -1277,6 +1431,9 @@ void GStreamerEngine::cleanupPipeline() {
     qosLastDropped = 0;
     qosProcessedTotal = 0;
     qosDroppedTotal = 0;
+    networkStatsWindowStartNs = 0;
+    networkStatsLastLogNs = 0;
+    networkStatsByteCount = 0;
 
     if (pipeline) {
         gst_element_set_state(pipeline, GST_STATE_NULL);
@@ -1310,12 +1467,6 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
-
-
-
-
-
-
 
 
 
