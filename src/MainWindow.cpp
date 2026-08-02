@@ -15,6 +15,7 @@
 #include "ui/LocalFileListWidget.h"
 #include "ui/SettingsDialog.h"
 #include "ui/AboutDialog.h"
+#include "ui/ThemeManager.h"
 #include "core/GStreamerEngine.h"
 #include "core/RecordingManager.h"
 #include "core/ConfigManager.h"
@@ -76,6 +77,9 @@ MainWindow::MainWindow(QWidget *parent)
     , clickTimer(new QTimer(this))
 {
     Logger::instance().info("MainWindow: Initializing main window...");
+    QSettings initialSettings("HywelStar", "HywelStarVideoPlayer");
+    ThemeManager::applyApplicationTheme(
+        ThemeManager::modeFromString(initialSettings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString()));
     setWindowTitle("HywelStar Video Player");
     setWindowIcon(QIcon(":/icons/app_icon"));
     resize(1280, 720);
@@ -106,33 +110,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::setupMenuBar() {
     QMenuBar *menuBar = new QMenuBar(this);
-    menuBar->setStyleSheet(R"(
-        QMenuBar {
-            background-color: #F5F6F8;
-            color: #2F343B;
-            padding: 2px;
-            border-bottom: 1px solid #D7DCE3;
-        }
-        QMenuBar::item {
-            background-color: transparent;
-            padding: 5px 10px;
-            border-radius: 4px;
-        }
-        QMenuBar::item:selected {
-            background-color: #EDEFF3;
-        }
-        QMenu {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-        }
-        QMenu::item {
-            padding: 6px 20px;
-        }
-        QMenu::item:selected {
-            background-color: #EEF2F7;
-        }
-    )");
+    menuBar->setStyleSheet(ThemeManager::mainMenuStyle());
     QAction *settingsTopAction = menuBar->addAction(tr("Settings"));
     connect(settingsTopAction, &QAction::triggered, this, &MainWindow::onShowSettings);
     QAction *aboutTopAction = menuBar->addAction(tr("About"));
@@ -157,12 +135,7 @@ void MainWindow::setupUI() {
     contentSplitter->setStretchFactor(0, 0);
     contentSplitter->setStretchFactor(1, 1);
     contentSplitter->setSizes({260, 1020});
-    contentSplitter->setStyleSheet(R"(
-        QSplitter::handle {
-            background-color: #D7DCE3;
-            width: 1px;
-        }
-    )");
+    contentSplitter->setStyleSheet(ThemeManager::splitterStyle());
     mainLayout->addWidget(contentSplitter, 1);
 
     // Add control bar
@@ -173,6 +146,7 @@ void MainWindow::setupUI() {
 
     setCentralWidget(centralWidget);
     setupPlaybackOverlay(centralWidget);
+    applyTheme();
 
     // Set window handle for GStreamer
     gstreamerEngine->setWindowHandle((WId)videoWidget->winId());
@@ -301,11 +275,15 @@ void MainWindow::onShowSettings() {
     dialog.setScreenshotPath(recordingManager->getScreenshotPath());
     dialog.setRecordingFormat(settings.value("recordingFormat", "mkv").toString().toLower());
     dialog.setNetworkLatency(qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs));
+    dialog.setThemeMode(settings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString());
 
     if (dialog.exec() == QDialog::Accepted) {
         recordingManager->setRecordingPath(dialog.getRecordingPath());
         recordingManager->setScreenshotPath(dialog.getScreenshotPath());
         settings.setValue("recordingFormat", dialog.getRecordingFormat());
+        settings.setValue("themeMode", dialog.getThemeMode());
+        ThemeManager::applyApplicationTheme(ThemeManager::modeFromString(dialog.getThemeMode()));
+        applyTheme();
         playbackEndMode = static_cast<PlaybackEndMode>(qBound(0, dialog.getLoopMode(), 2));
         controlBar->setPlaybackEndMode(playbackEndMode);
         settings.setValue("loopMode", static_cast<int>(playbackEndMode));
@@ -628,6 +606,14 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
         return QMainWindow::eventFilter(watched, event);
     }
 
+    QWidget *activeModal = QApplication::activeModalWidget();
+    if (activeModal && activeModal != this) {
+        mousePressedInVideo = false;
+        suppressClickToggle = false;
+        clickTimer->stop();
+        return QMainWindow::eventFilter(watched, event);
+    }
+
     switch (event->type()) {
     case QEvent::Resize:
     case QEvent::Move:
@@ -736,6 +722,10 @@ void MainWindow::loadSettings() {
         restoreGeometry(settings.value("geometry").toByteArray());
     }
 
+    ThemeManager::applyApplicationTheme(
+        ThemeManager::modeFromString(settings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString()));
+    applyTheme();
+
     // Last URI
     QString lastUri = settings.value("lastUri", "").toString();
     if (!lastUri.isEmpty() && !isLocalFileUri(lastUri)) {
@@ -796,6 +786,7 @@ void MainWindow::saveSettings() {
     settings.setValue("playbackRate", gstreamerEngine->playbackRate());
     settings.setValue("stretchVideo", gstreamerEngine->stretchVideo());
     settings.setValue("loopMode", static_cast<int>(playbackEndMode));
+    settings.setValue("themeMode", qApp->property("themeMode").toString());
 
     // Network latency
     int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
@@ -829,36 +820,7 @@ void MainWindow::setupPlaybackOverlay(QWidget *parent) {
     playbackOverlay = new QWidget(parent);
     playbackOverlay->setVisible(false);
     playbackOverlay->setMouseTracking(true);
-    playbackOverlay->setStyleSheet(R"(
-        QWidget {
-            background-color: rgba(0, 0, 0, 165);
-            border-radius: 6px;
-        }
-        QLabel {
-            color: #FFFFFF;
-            background: transparent;
-        }
-        QSlider {
-            background: transparent;
-        }
-        QSlider::groove:horizontal {
-            border: none;
-            height: 5px;
-            background: rgba(255, 255, 255, 90);
-            border-radius: 2px;
-        }
-        QSlider::sub-page:horizontal {
-            background: #DDE7F8;
-            border-radius: 2px;
-        }
-        QSlider::handle:horizontal {
-            background: #FFFFFF;
-            border: none;
-            width: 14px;
-            margin: -5px 0;
-            border-radius: 7px;
-        }
-    )");
+    playbackOverlay->setStyleSheet(ThemeManager::playbackOverlayStyle());
 
     auto *layout = new QHBoxLayout(playbackOverlay);
     layout->setContentsMargins(12, 8, 12, 8);
@@ -890,6 +852,30 @@ void MainWindow::setupPlaybackOverlay(QWidget *parent) {
     });
 
     positionPlaybackOverlay();
+}
+
+void MainWindow::applyTheme() {
+    if (menuBar()) {
+        menuBar()->setStyleSheet(ThemeManager::mainMenuStyle());
+    }
+    if (contentSplitter) {
+        contentSplitter->setStyleSheet(ThemeManager::splitterStyle());
+    }
+    if (quickConnectBar) {
+        quickConnectBar->applyTheme();
+    }
+    if (localFileList) {
+        localFileList->applyTheme();
+    }
+    if (controlBar) {
+        controlBar->applyTheme();
+    }
+    if (statusBar) {
+        statusBar->applyTheme();
+    }
+    if (playbackOverlay) {
+        playbackOverlay->setStyleSheet(ThemeManager::playbackOverlayStyle());
+    }
 }
 
 void MainWindow::positionPlaybackOverlay() {
@@ -964,6 +950,3 @@ QString MainWindow::formatPlaybackTime(qint64 milliseconds) const {
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0'));
 }
-
-
-

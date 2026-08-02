@@ -14,6 +14,9 @@
         <file alias="stream">icons/stream.svg</file>
         <file alias="upload">icons/upload.svg</file>
         <file alias="settings">icons/settings.svg</file>
+        <file alias="combo_down">icons/combo_down.svg</file>
+        <file alias="spin_plus">icons/spin_plus.svg</file>
+        <file alias="spin_minus">icons/spin_minus.svg</file>
         <file alias="expand">icons/expand.svg</file>
         <file alias="collapse">icons/collapse.svg</file>
         <file alias="fullscreen">icons/fullscreen.svg</file>

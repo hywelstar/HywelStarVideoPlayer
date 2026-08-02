@@ -8,6 +8,7 @@
  */
 
 #include "SettingsDialog.h"
+#include "ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -18,16 +19,17 @@
 #include <QSettings>
 #include <QCoreApplication>
 #include <QTabWidget>
+#include <QAbstractSpinBox>
 #include <QtGlobal>
 
 namespace {
 constexpr int kMinNetworkLatencyMs = 0;
 constexpr int kMaxNetworkLatencyMs = 5000;
 constexpr int kDefaultNetworkLatencyMs = 0;
-constexpr int kDialogButtonWidth = 112;
-constexpr int kDialogButtonHeight = 44;
-constexpr int kBrowseButtonWidth = 112;
-constexpr int kBrowseButtonHeight = 40;
+constexpr int kDialogButtonWidth = 88;
+constexpr int kDialogButtonHeight = 38;
+constexpr int kBrowseButtonWidth = 96;
+constexpr int kFieldHeight = 38;
 }
 
 SettingsDialog::SettingsDialog(QWidget *parent)
@@ -60,6 +62,7 @@ void SettingsDialog::setupUI() {
 
     playbackGrid->addWidget(new QLabel(tr("Loop Mode:")), 0, 0);
     loopModeCombo = new QComboBox();
+    loopModeCombo->setMinimumHeight(kFieldHeight);
     loopModeCombo->addItem(tr("Play Once"), 0);
     loopModeCombo->addItem(tr("Loop One"), 1);
     loopModeCombo->addItem(tr("Loop All"), 2);
@@ -72,6 +75,8 @@ void SettingsDialog::setupUI() {
 
     playbackGrid->addWidget(new QLabel(tr("Buffer size (ms):")), 2, 0);
     bufferSizeSpinBox = new QSpinBox();
+    bufferSizeSpinBox->setMinimumHeight(kFieldHeight);
+    bufferSizeSpinBox->setButtonSymbols(QAbstractSpinBox::PlusMinus);
     bufferSizeSpinBox->setRange(50, 5000);
     bufferSizeSpinBox->setValue(100);
     bufferSizeSpinBox->setSuffix(" ms");
@@ -79,11 +84,21 @@ void SettingsDialog::setupUI() {
 
     playbackGrid->addWidget(new QLabel(tr("Network latency (ms):")), 3, 0);
     networkLatencySpinBox = new QSpinBox();
+    networkLatencySpinBox->setMinimumHeight(kFieldHeight);
+    networkLatencySpinBox->setButtonSymbols(QAbstractSpinBox::PlusMinus);
     networkLatencySpinBox->setRange(kMinNetworkLatencyMs, kMaxNetworkLatencyMs);
     networkLatencySpinBox->setValue(kDefaultNetworkLatencyMs);
     networkLatencySpinBox->setSuffix(" ms");
     networkLatencySpinBox->setToolTip(tr("0 ms for lowest delay; increase when network jitter appears"));
     playbackGrid->addWidget(networkLatencySpinBox, 3, 1);
+
+    playbackGrid->addWidget(new QLabel(tr("Theme:")), 4, 0);
+    themeCombo = new QComboBox();
+    themeCombo->setMinimumHeight(kFieldHeight);
+    themeCombo->addItem(tr("System"), ThemeManager::modeToString(ThemeMode::System));
+    themeCombo->addItem(tr("Light"), ThemeManager::modeToString(ThemeMode::Light));
+    themeCombo->addItem(tr("Dark"), ThemeManager::modeToString(ThemeMode::Dark));
+    playbackGrid->addWidget(themeCombo, 4, 1);
 
     playbackLayout->addWidget(playbackGroup);
     playbackLayout->addStretch();
@@ -98,14 +113,16 @@ void SettingsDialog::setupUI() {
 
     recordingGrid->addWidget(new QLabel(tr("Format:")), 0, 0);
     recordingFormatCombo = new QComboBox();
+    recordingFormatCombo->setMinimumHeight(kFieldHeight);
     recordingFormatCombo->addItem("MKV", "mkv");
     recordingGrid->addWidget(recordingFormatCombo, 0, 1, 1, 2);
 
     recordingGrid->addWidget(new QLabel(tr("Recording Path:")), 1, 0);
     recordingPathEdit = new QLineEdit();
+    recordingPathEdit->setMinimumHeight(kFieldHeight);
     recordingGrid->addWidget(recordingPathEdit, 1, 1);
     QPushButton *browseRecordingBtn = new QPushButton(tr("Browse"));
-    browseRecordingBtn->setFixedSize(kBrowseButtonWidth, kBrowseButtonHeight);
+    browseRecordingBtn->setFixedSize(kBrowseButtonWidth, kFieldHeight);
     connect(browseRecordingBtn, &QPushButton::clicked, this, [this]() {
         QString dir = QFileDialog::getExistingDirectory(this, tr("Select Recording Directory"),
                                                         recordingPathEdit->text());
@@ -117,9 +134,10 @@ void SettingsDialog::setupUI() {
 
     recordingGrid->addWidget(new QLabel(tr("Screenshot Path:")), 2, 0);
     screenshotPathEdit = new QLineEdit();
+    screenshotPathEdit->setMinimumHeight(kFieldHeight);
     recordingGrid->addWidget(screenshotPathEdit, 2, 1);
     QPushButton *browseScreenshotBtn = new QPushButton(tr("Browse"));
-    browseScreenshotBtn->setFixedSize(kBrowseButtonWidth, kBrowseButtonHeight);
+    browseScreenshotBtn->setFixedSize(kBrowseButtonWidth, kFieldHeight);
     connect(browseScreenshotBtn, &QPushButton::clicked, this, [this]() {
         QString dir = QFileDialog::getExistingDirectory(this, tr("Select Screenshot Directory"),
                                                         screenshotPathEdit->text());
@@ -138,19 +156,8 @@ void SettingsDialog::setupUI() {
     buttonLayout->addStretch();
 
     QPushButton *okButton = new QPushButton(tr("OK"));
-    okButton->setFixedWidth(80);
-    okButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #7A97CC;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 0px;
-        }
-        QPushButton:hover {
-            background-color: #6A87B8;
-        }
-    )");
+    okButton->setFixedSize(kDialogButtonWidth, kDialogButtonHeight);
+    okButton->setStyleSheet(ThemeManager::primaryButtonStyle());
     connect(okButton, &QPushButton::clicked, this, [this]() {
         saveSettings();
         accept();
@@ -158,7 +165,7 @@ void SettingsDialog::setupUI() {
     buttonLayout->addWidget(okButton);
 
     QPushButton *cancelButton = new QPushButton(tr("Cancel"));
-    cancelButton->setFixedWidth(80);
+    cancelButton->setFixedSize(kDialogButtonWidth, kDialogButtonHeight);
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     buttonLayout->addWidget(cancelButton);
 
@@ -176,6 +183,7 @@ void SettingsDialog::loadSettings() {
                                settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(),
                                kMaxNetworkLatencyMs);
     networkLatencySpinBox->setValue(latency);
+    setThemeMode(settings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString());
 
     QString recordingFormat = settings.value("recordingFormat", "mkv").toString().toLower();
     int formatIndex = recordingFormatCombo->findData(recordingFormat);
@@ -195,6 +203,7 @@ void SettingsDialog::saveSettings() {
     settings.setValue("bufferSize", bufferSizeSpinBox->value());
     settings.setValue("networkLatency",
                       qBound(kMinNetworkLatencyMs, networkLatencySpinBox->value(), kMaxNetworkLatencyMs));
+    settings.setValue("themeMode", getThemeMode());
 
     settings.setValue("recordingFormat", recordingFormatCombo->currentData().toString());
     settings.setValue("recordingPath", recordingPathEdit->text());
@@ -229,6 +238,10 @@ int SettingsDialog::getLoopMode() const {
     return loopModeCombo->currentData().toInt();
 }
 
+QString SettingsDialog::getThemeMode() const {
+    return themeCombo->currentData().toString();
+}
+
 void SettingsDialog::setRecordingPath(const QString &path) {
     recordingPathEdit->setText(path);
 }
@@ -260,7 +273,10 @@ void SettingsDialog::setLoopMode(int mode) {
     loopModeCombo->setCurrentIndex(mode);
 }
 
-
+void SettingsDialog::setThemeMode(const QString &mode) {
+    const int index = themeCombo->findData(mode);
+    themeCombo->setCurrentIndex(index >= 0 ? index : 0);
+}
 
 
 

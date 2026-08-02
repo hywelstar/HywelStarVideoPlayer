@@ -118,6 +118,7 @@ set(SOURCES
     src/ui/LocalFileListWidget.cpp
     src/ui/SettingsDialog.cpp
     src/ui/AboutDialog.cpp
+    src/ui/ThemeManager.cpp
     src/utils/Logger.cpp
     src/utils/StreamParser.cpp
 )
@@ -134,6 +135,7 @@ set(HEADERS
     src/ui/LocalFileListWidget.h
     src/ui/SettingsDialog.h
     src/ui/AboutDialog.h
+    src/ui/ThemeManager.h
     src/utils/Logger.h
     src/utils/StreamParser.h
 )

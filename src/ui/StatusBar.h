@@ -12,6 +12,7 @@
 
 #include <QStatusBar>
 #include <QLabel>
+#include <QList>
 
 class StatusBar : public QStatusBar {
     Q_OBJECT
@@ -24,6 +25,7 @@ public:
     void updateConnectionStatus(const QString &status);
     void updateRecordingStatus(bool recording);
     void showError(const QString &error);
+    void applyTheme();
 
 private slots:
     void updateTime();
@@ -38,6 +40,7 @@ private:
     QLabel *delayLabel;
     QLabel *recordingLabel;
     QLabel *timeLabel;
+    QList<QLabel *> separatorLabels;
 };
 
 #endif // STATUS_BAR_H

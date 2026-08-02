@@ -46,6 +46,7 @@ public:
     void setPlaybackRate(double rate);
     void setPlaybackEndMode(PlaybackEndMode mode);
     PlaybackEndMode playbackEndMode() const;
+    void applyTheme();
 
 signals:
     void playPauseRequested();

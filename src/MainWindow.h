@@ -84,6 +84,7 @@ private:
     void setLocalFilePanelVisible(bool visible);
     void playLocalFilePath(const QString &filePath, bool restartPlayback);
     void setupPlaybackOverlay(QWidget *parent);
+    void applyTheme();
     void positionPlaybackOverlay();
     void showPlaybackOverlay();
     void hidePlaybackOverlay();

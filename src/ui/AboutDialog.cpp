@@ -8,6 +8,7 @@
  */
 
 #include "AboutDialog.h"
+#include "ThemeManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -20,42 +21,45 @@ AboutDialog::AboutDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("About"));
-    setFixedSize(420, 340);
+    setFixedSize(440, 360);
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    const ThemePalette palette = ThemeManager::currentPalette();
+    setStyleSheet(ThemeManager::settingsDialogStyle());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(15);
-    mainLayout->setContentsMargins(30, 30, 30, 30);
+    mainLayout->setSpacing(10);
+    mainLayout->setContentsMargins(32, 24, 32, 24);
 
     QLabel *iconLabel = new QLabel();
-    iconLabel->setFixedSize(112, 112);
-    QPixmap iconPixmap = QIcon(":/icons/app_icon").pixmap(QSize(96, 96));
-    iconLabel->setPixmap(iconPixmap.scaled(92, 92, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    iconLabel->setFixedSize(88, 88);
+    QPixmap iconPixmap = QIcon(":/icons/app_icon").pixmap(QSize(80, 80));
+    iconLabel->setPixmap(iconPixmap.scaled(78, 78, Qt::KeepAspectRatio, Qt::SmoothTransformation));
     iconLabel->setAlignment(Qt::AlignCenter);
-    mainLayout->addWidget(iconLabel);
+    mainLayout->addWidget(iconLabel, 0, Qt::AlignHCenter);
 
     QLabel *nameLabel = new QLabel("HywelStar Video Player");
-    nameLabel->setStyleSheet("font-size: 18px; font-weight: bold; color: #333;");
+    nameLabel->setMinimumHeight(26);
+    nameLabel->setStyleSheet(QString("font-size: 18px; font-weight: bold; color: %1;").arg(palette.textPrimary));
     nameLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(nameLabel);
 
     QLabel *versionLabel = new QLabel(QString("Version %1").arg(QApplication::applicationVersion()));
-    versionLabel->setStyleSheet("font-size: 14px; color: #666;");
+    versionLabel->setStyleSheet(QString("font-size: 14px; color: %1;").arg(palette.textSecondary));
     versionLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(versionLabel);
 
     QLabel *descLabel = new QLabel(tr("A cross-platform video player\nbased on GStreamer and Qt 6.10"));
-    descLabel->setStyleSheet("font-size: 12px; color: #666;");
+    descLabel->setStyleSheet(QString("font-size: 12px; color: %1;").arg(palette.textSecondary));
     descLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(descLabel);
 
     QLabel *authorLabel = new QLabel(tr("Author: hywelstar\nEmail: hywelstar@163.com"));
-    authorLabel->setStyleSheet("font-size: 12px; color: #888;");
+    authorLabel->setStyleSheet(QString("font-size: 12px; color: %1;").arg(palette.textMuted));
     authorLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(authorLabel);
 
     QLabel *githubLabel = new QLabel("<a href=\"https://github.com/hywelstar/HywelStarVideoPlayer\">GitHub: hywelstar/HywelStarVideoPlayer</a>");
-    githubLabel->setStyleSheet("font-size: 12px; color: #5A7FB8;");
+    githubLabel->setStyleSheet(QString("font-size: 12px; color: %1;").arg(palette.accent));
     githubLabel->setTextFormat(Qt::RichText);
     githubLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
     githubLabel->setOpenExternalLinks(true);
@@ -63,7 +67,7 @@ AboutDialog::AboutDialog(QWidget *parent)
     mainLayout->addWidget(githubLabel);
 
     QLabel *copyrightLabel = new QLabel("(C) 2026 HywelStar. All rights reserved.");
-    copyrightLabel->setStyleSheet("font-size: 11px; color: #aaa;");
+    copyrightLabel->setStyleSheet(QString("font-size: 11px; color: %1;").arg(palette.textMuted));
     copyrightLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(copyrightLabel);
 
@@ -72,19 +76,8 @@ AboutDialog::AboutDialog(QWidget *parent)
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->addStretch();
     QPushButton *okButton = new QPushButton(tr("OK"));
-    okButton->setFixedWidth(80);
-    okButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #7A97CC;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 16px;
-        }
-        QPushButton:hover {
-            background-color: #6A87B8;
-        }
-    )");
+    okButton->setFixedSize(88, 38);
+    okButton->setStyleSheet(ThemeManager::primaryButtonStyle());
     connect(okButton, &QPushButton::clicked, this, &QDialog::accept);
     buttonLayout->addWidget(okButton);
     buttonLayout->addStretch();

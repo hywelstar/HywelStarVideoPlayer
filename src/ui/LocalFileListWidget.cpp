@@ -8,6 +8,7 @@
  */
 
 #include "LocalFileListWidget.h"
+#include "ThemeManager.h"
 #include <QAbstractItemView>
 #include <QColor>
 #include <QDir>
@@ -37,55 +38,12 @@ LocalFileListWidget::LocalFileListWidget(QWidget *parent)
 void LocalFileListWidget::setupUI() {
     setMinimumWidth(220);
     setMaximumWidth(380);
-    setStyleSheet(R"(
-        LocalFileListWidget {
-            background-color: #F5F6F8;
-            border-right: 1px solid #D7DCE3;
-        }
-        QLabel {
-            background: transparent;
-            color: #6B7280;
-        }
-        QListWidget {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 4px;
-            outline: none;
-        }
-        QListWidget::item {
-            padding: 7px 8px;
-            border-radius: 4px;
-        }
-        QListWidget::item:selected {
-            background-color: #DDE7F8;
-            color: #2F343B;
-        }
-        QListWidget::item:hover {
-            background-color: #EEF2F7;
-        }
-        QPushButton {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 7px 9px;
-        }
-        QPushButton:hover {
-            background-color: #F0F2F5;
-        }
-        QPushButton:pressed {
-            background-color: #E7EAEE;
-        }
-    )");
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(12, 10, 12, 10);
     layout->setSpacing(8);
 
     titleLabel = new QLabel(tr("Local Files"));
-    titleLabel->setStyleSheet("color: #2F343B; font-weight: 700;");
     layout->addWidget(titleLabel);
 
     auto *buttonLayout = new QHBoxLayout();
@@ -109,7 +67,6 @@ void LocalFileListWidget::setupUI() {
     emptyLabel = new QLabel(tr("Add files or folders to build a local playback list."));
     emptyLabel->setWordWrap(true);
     emptyLabel->setAlignment(Qt::AlignCenter);
-    emptyLabel->setStyleSheet("color: #8A94A3; padding: 10px;");
     layout->addWidget(emptyLabel);
 
     auto *manageLayout = new QHBoxLayout();
@@ -124,6 +81,7 @@ void LocalFileListWidget::setupUI() {
     manageLayout->addWidget(clearButton);
 
     layout->addLayout(manageLayout);
+    applyTheme();
     updateEmptyState();
 }
 
@@ -205,13 +163,27 @@ void LocalFileListWidget::setNowPlayingFilePath(const QString &filePath) {
         QFont itemFont = item->font();
         itemFont.setBold(isPlaying);
         item->setFont(itemFont);
-        item->setBackground(isPlaying ? QColor("#DDE7F8") : QColor(Qt::transparent));
-        item->setForeground(QColor("#2F343B"));
+        const ThemePalette palette = ThemeManager::currentPalette();
+        item->setBackground(isPlaying ? QColor(palette.checkedBg) : QColor(Qt::transparent));
+        item->setForeground(QColor(isPlaying ? palette.textPrimary : palette.textPrimary));
 
         if (isPlaying) {
             fileList->setCurrentItem(item);
             fileList->scrollToItem(item);
         }
+    }
+}
+
+void LocalFileListWidget::applyTheme() {
+    const ThemePalette palette = ThemeManager::currentPalette();
+    setStyleSheet(ThemeManager::localFileListStyle());
+    titleLabel->setStyleSheet(QString("color: %1; font-weight: 700;").arg(palette.textPrimary));
+    emptyLabel->setStyleSheet(QString("color: %1; padding: 10px;").arg(palette.textMuted));
+    for (int i = 0; i < fileList->count(); ++i) {
+        QListWidgetItem *item = fileList->item(i);
+        const bool isPlaying = item->font().bold();
+        item->setBackground(isPlaying ? QColor(palette.checkedBg) : QColor(Qt::transparent));
+        item->setForeground(QColor(palette.textPrimary));
     }
 }
 

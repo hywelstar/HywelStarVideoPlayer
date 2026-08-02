@@ -29,6 +29,7 @@ public:
     void selectFilePath(const QString &filePath);
     void setNowPlayingFilePath(const QString &filePath);
     QString nextFilePath(const QString &filePath) const;
+    void applyTheme();
 
 signals:
     void playFileRequested(const QString &filePath);

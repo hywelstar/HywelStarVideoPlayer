@@ -8,6 +8,7 @@
  */
 
 #include "QuickConnectBar.h"
+#include "ThemeManager.h"
 #include <QButtonGroup>
 #include <QHBoxLayout>
 #include <QSettings>
@@ -23,8 +24,8 @@ QuickConnectBar::QuickConnectBar(QWidget *parent)
 
 void QuickConnectBar::setupUI() {
     QHBoxLayout *layout = new QHBoxLayout(this);
-    layout->setContentsMargins(14, 8, 14, 8);
-    layout->setSpacing(10);
+    layout->setContentsMargins(16, 11, 16, 11);
+    layout->setSpacing(13);
 
     // App title label
     titleLabel = new QLabel("HywelStar Player");
@@ -35,95 +36,37 @@ void QuickConnectBar::setupUI() {
     modeGroup->setExclusive(true);
 
     streamModeButton = new QPushButton(tr("Stream"));
+    streamModeButton->setObjectName("streamModeButton");
     streamModeButton->setCheckable(true);
     streamModeButton->setChecked(true);
+    streamModeButton->setFixedSize(176, 50);
     streamModeButton->setToolTip(tr("Play stream URLs"));
     modeGroup->addButton(streamModeButton, 0);
     layout->addWidget(streamModeButton);
 
     localModeButton = new QPushButton(tr("Local"));
+    localModeButton->setObjectName("localModeButton");
     localModeButton->setCheckable(true);
+    localModeButton->setFixedSize(158, 50);
     localModeButton->setToolTip(tr("Show local media files"));
     modeGroup->addButton(localModeButton, 1);
     layout->addWidget(localModeButton);
 
     // URI input
     uriInput = new QLineEdit();
+    uriInput->setMinimumHeight(50);
     uriInput->setPlaceholderText(tr("Enter stream URL (rtsp://, udp://, http://...) and press Enter"));
     layout->addWidget(uriInput, 1);
 
     // Settings button
     settingsButton = new QPushButton();
+    settingsButton->setFixedSize(50, 50);
     settingsButton->setIcon(QIcon(":/icons/settings"));
     settingsButton->setIconSize(QSize(20, 20));
     settingsButton->setToolTip(tr("Settings"));
     layout->addWidget(settingsButton);
 
-    titleLabel->setStyleSheet(R"(
-        background-color: #FFFFFF;
-        color: #2F343B;
-        font-weight: 700;
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid #D7DCE3;
-    )");
-
-    uriInput->setStyleSheet(R"(
-        QLineEdit {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 8px 12px;
-            selection-background-color: #DDE7F8;
-            selection-color: #ffffff;
-        }
-        QLineEdit:focus {
-            border: 1px solid #7A97CC;
-        }
-    )");
-
-    settingsButton->setStyleSheet(R"(
-        QPushButton {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 8px;
-            min-width: 36px;
-            min-height: 36px;
-        }
-        QPushButton:hover {
-            background-color: #F0F2F5;
-        }
-        QPushButton:pressed {
-            background-color: #E7EAEE;
-        }
-    )");
-
-    const char *modeButtonStyle = R"(
-        QPushButton {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 8px 12px;
-            min-height: 36px;
-            min-width: 68px;
-        }
-        QPushButton:checked {
-            background-color: #DDE7F8;
-            border-color: #7A97CC;
-            font-weight: 700;
-        }
-        QPushButton:hover {
-            background-color: #F0F2F5;
-        }
-    )";
-    streamModeButton->setStyleSheet(QString::fromLatin1(modeButtonStyle));
-    localModeButton->setStyleSheet(QString::fromLatin1(modeButtonStyle));
-
-    setStyleSheet("QWidget { background-color: #F5F6F8; }");
+    applyTheme();
 }
 
 void QuickConnectBar::connectSignals() {
@@ -210,4 +153,13 @@ void QuickConnectBar::setLocalMode(bool localMode) {
 
 bool QuickConnectBar::isLocalMode() const {
     return localModeButton->isChecked();
+}
+
+void QuickConnectBar::applyTheme() {
+    titleLabel->setStyleSheet(QString());
+    uriInput->setStyleSheet(QString());
+    settingsButton->setStyleSheet(QString());
+    streamModeButton->setStyleSheet(QString());
+    localModeButton->setStyleSheet(QString());
+    setStyleSheet(ThemeManager::quickConnectBarStyle());
 }

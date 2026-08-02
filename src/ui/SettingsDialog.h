@@ -30,6 +30,7 @@ public:
     int getNetworkLatency() const;
     bool getAutoPlayNext() const;
     int getLoopMode() const;
+    QString getThemeMode() const;
 
     // Setters
     void setRecordingPath(const QString &path);
@@ -39,6 +40,7 @@ public:
     void setNetworkLatency(int latencyMs);
     void setAutoPlayNext(bool enabled);
     void setLoopMode(int mode);
+    void setThemeMode(const QString &mode);
 
 private:
     void setupUI();
@@ -50,6 +52,7 @@ private:
     QCheckBox *autoPlayNextCheck;
     QSpinBox *bufferSizeSpinBox;
     QSpinBox *networkLatencySpinBox;
+    QComboBox *themeCombo;
 
     // Recording settings
     QComboBox *recordingFormatCombo;

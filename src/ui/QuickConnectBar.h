@@ -28,6 +28,7 @@ public:
     void setUri(const QString &uri);
     void setLocalMode(bool localMode);
     bool isLocalMode() const;
+    void applyTheme();
 
 signals:
     void playRequested(const QString &uri);

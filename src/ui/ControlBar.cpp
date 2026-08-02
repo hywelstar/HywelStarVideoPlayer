@@ -8,6 +8,7 @@
  */
 
 #include "ControlBar.h"
+#include "ThemeManager.h"
 #include <QHBoxLayout>
 #include <QComboBox>
 #include <QStyle>
@@ -20,50 +21,7 @@ ControlBar::ControlBar(QWidget *parent)
 {
     setupUI();
     connectSignals();
-    setStyleSheet(R"(
-        QWidget {
-            background-color: #F5F6F8;
-        }
-        QPushButton {
-            background-color: #FFFFFF;
-            color: #2F343B;
-            border: 1px solid #D7DCE3;
-            border-radius: 6px;
-            padding: 8px;
-            min-width: 36px;
-            min-height: 36px;
-        }
-        QPushButton:hover {
-            background-color: #F0F2F5;
-        }
-        QPushButton:pressed {
-            background-color: #E7EAEE;
-        }
-        QPushButton:checked {
-            background-color: #DDE7F8;
-            border-color: #9FB5DE;
-        }
-        QSlider::groove:horizontal {
-            border: none;
-            height: 6px;
-            background: #D7DCE3;
-            border-radius: 3px;
-        }
-        QSlider::handle:horizontal {
-            background: #2F343B;
-            border: none;
-            width: 14px;
-            margin: -4px 0;
-            border-radius: 7px;
-        }
-        QSlider::handle:horizontal:hover {
-            background: #2F343B;
-        }
-        QLabel {
-            background: transparent;
-            color: #6B7280;
-        }
-    )");
+    applyTheme();
 }
 
 void ControlBar::setupUI() {
@@ -89,7 +47,7 @@ void ControlBar::setupUI() {
 
     // Recording time label
     recordingTimeLabel = new QLabel("00:00");
-    recordingTimeLabel->setStyleSheet("color: #D96B6B; font-weight: bold;");
+    recordingTimeLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(ThemeManager::currentPalette().danger));
     recordingTimeLabel->setMinimumWidth(50);
     layout->addWidget(recordingTimeLabel);
 
@@ -162,30 +120,7 @@ void ControlBar::setupUI() {
     volumeSlider->setMaximumWidth(132);
     volumeSlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     volumeSlider->setToolTip(tr("Volume"));
-    volumeSlider->setStyleSheet(R"(
-        QSlider {
-            background-color: #FFFFFF;
-            border-radius: 6px;
-            border: 1px solid #D7DCE3;
-            padding: 4px;
-        }
-        QSlider::groove:horizontal {
-            border: none;
-            height: 6px;
-            background: #D7DCE3;
-            border-radius: 3px;
-        }
-        QSlider::handle:horizontal {
-            background: #2F343B;
-            border: none;
-            width: 14px;
-            margin: -4px 0;
-            border-radius: 7px;
-        }
-        QSlider::handle:horizontal:hover {
-            background: #2F343B;
-        }
-    )");
+    volumeSlider->setStyleSheet(ThemeManager::volumeSliderStyle());
     layout->addWidget(volumeSlider);
 }
 
@@ -325,6 +260,11 @@ PlaybackEndMode ControlBar::playbackEndMode() const {
     return static_cast<PlaybackEndMode>(endModeComboBox->currentData().toInt());
 }
 
+void ControlBar::applyTheme() {
+    setStyleSheet(ThemeManager::controlBarStyle());
+    volumeSlider->setStyleSheet(ThemeManager::volumeSliderStyle());
+    recordingTimeLabel->setStyleSheet(QString("color: %1; font-weight: bold;").arg(ThemeManager::currentPalette().danger));
+}
 
 
 
