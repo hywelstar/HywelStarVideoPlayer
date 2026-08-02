@@ -1,5 +1,7 @@
 # HywelStar Player
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP, SRT, HLS, DASH, HTTP streams and local video files.
 
 ![image-20260802142054603](image/image-20260802142054603.png)
