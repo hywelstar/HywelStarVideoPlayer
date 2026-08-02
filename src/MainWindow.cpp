@@ -444,6 +444,9 @@ void MainWindow::onToggleFullScreen() {
     hidePlaybackOverlay();
     if (isFullScreen) {
         Logger::instance().debug("MainWindow: Exiting fullscreen");
+        if (menuBar()) {
+            menuBar()->show();
+        }
         quickConnectBar->show();
         isFullScreen = false;
         setLocalFilePanelVisible(localFilePanelVisible);
@@ -452,6 +455,9 @@ void MainWindow::onToggleFullScreen() {
         showNormal();
     } else {
         Logger::instance().debug("MainWindow: Entering fullscreen");
+        if (menuBar()) {
+            menuBar()->hide();
+        }
         quickConnectBar->hide();
         localFileList->hide();
         controlBar->hide();
