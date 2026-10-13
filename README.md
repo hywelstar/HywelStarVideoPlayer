@@ -37,7 +37,8 @@ A GStreamer-based video player built with Qt 6, supporting RTSP, UDP, TCP, RTMP,
 | Playback Progress Overlay | Done | In-video progress bar with seek, auto-hide |
 | Playback Speed Control | Done | 0.5x - 2x |
 | Fit/Stretch Display | Done | Aspect fit or stretch toggle |
-| Bitrate Display | Done | Local average bitrate and RTSP RTP video bitrate |
+| Playback Protocol Status | Done | Status bar shows Local, RTSP, RTMP, HLS, DASH, and other stream types |
+| Bitrate Display | Done | Local average bitrate, RTSP RTP bitrate, and decoded video throughput labels |
 | Video Recording | Done | MKV format, local and stream playback recording |
 | Screenshot | Done | PNG format |
 | Grid Overlay | Done | For positioning |
@@ -165,7 +166,8 @@ deploy_windows.bat Release
 - **Stream mode**: enter RTSP/UDP/TCP/RTMP/SRT/HLS/DASH/HTTP/HTTPS URLs in the top bar.
 - **Local mode**: select files or folders from the local playlist.
 - **Local playback end behavior**: choose Play Once, Loop One, or Loop All.
-- **Bitrate display**: local files show average media bitrate; RTSP streams show measured RTP video bitrate when available.
+- **Status display**: the status bar shows the active playback type, such as `Playing Local`, `Playing RTSP`, `Playing RTMP`, `Playing HLS`, or `Playing DASH`.
+- **Bitrate display**: local files show `Avg Mbps`; RTSP streams show measured `RTP Mbps` when available; other stream protocols show decoded `Video Mbps`, which is not necessarily the raw network bitrate.
 - **Theme**: choose System, Light, or Dark from Settings.
 
 ## Tested Stream URLs
@@ -213,6 +215,9 @@ HywelStarPlayer/
 - **Build System**: CMake 3.16+
 
 ## Changelog
+
+### Unreleased
+- Added playback protocol display in the status bar and clearer bitrate labels.
 
 ### v1.1.2 (Released 2026-08-02)
 - Added tested RTSP, RTMP, HLS, and MPEG-DASH stream coverage notes.

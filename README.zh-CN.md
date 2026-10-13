@@ -37,7 +37,8 @@ HywelStar Player 是一个基于 Qt 6 和 GStreamer 的视频播放器，支持 
 | 播放进度浮层 | 已完成 | 视频画面内进度条、拖动跳转、自动隐藏 |
 | 播放倍速控制 | 已完成 | 0.5x - 2x |
 | 适应/拉伸显示 | 已完成 | 保持比例或拉伸显示 |
-| 码率显示 | 已完成 | 本地平均码率和 RTSP RTP 视频码率 |
+| 播放协议状态 | 已完成 | 状态栏显示 Local、RTSP、RTMP、HLS、DASH 等播放类型 |
+| 码率显示 | 已完成 | 本地平均码率、RTSP RTP 码率和解码视频吞吐标签 |
 | 视频录制 | 已完成 | MKV 格式，支持本地和网络流播放录制 |
 | 截图 | 已完成 | PNG 格式 |
 | 网格叠加 | 已完成 | 用于画面定位 |
@@ -165,7 +166,8 @@ deploy_windows.bat Release
 - **Stream 模式**：在顶部输入框输入 RTSP/UDP/TCP/RTMP/SRT/HLS/DASH/HTTP/HTTPS URL。
 - **Local 模式**：从本地播放列表选择文件或文件夹。
 - **本地播放结束行为**：可选择 Play Once、Loop One、Loop All。
-- **码率显示**：本地文件显示平均媒体码率；RTSP 流在可用时显示测量到的 RTP 视频码率。
+- **状态显示**：状态栏会显示当前播放类型，例如 `Playing Local`、`Playing RTSP`、`Playing RTMP`、`Playing HLS` 或 `Playing DASH`。
+- **码率显示**：本地文件显示 `Avg Mbps`；RTSP 流在可用时显示测量到的 `RTP Mbps`；其他网络流显示解码后的 `Video Mbps`，它不一定等同于原始网络码率。
 - **主题**：可在 Settings 中选择 System、Light、Dark。
 
 ## 已测试流地址
@@ -213,6 +215,9 @@ HywelStarPlayer/
 - **构建系统**：CMake 3.16+
 
 ## 更新日志
+
+### Unreleased
+- 增加状态栏播放协议显示和更清晰的码率标签。
 
 ### v1.1.2 (Released 2026-08-02)
 - 增加 RTSP、RTMP、HLS、MPEG-DASH 已测试流地址说明。
