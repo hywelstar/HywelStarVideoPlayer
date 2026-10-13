@@ -39,6 +39,7 @@ HywelStar Player 是一个基于 Qt 6 和 GStreamer 的视频播放器，支持 
 | 适应/拉伸显示 | 已完成 | 保持比例或拉伸显示 |
 | 播放协议状态 | 已完成 | 状态栏显示 Local、RTSP、RTMP、HLS、DASH 等播放类型 |
 | 码率显示 | 已完成 | 本地平均码率、RTSP RTP 码率和解码视频吞吐标签 |
+| RTSP 传输模式 | 已完成 | 可在 Settings 中选择 Auto、TCP 或 UDP |
 | 视频录制 | 已完成 | MKV 格式，支持本地和网络流播放录制 |
 | 截图 | 已完成 | PNG 格式 |
 | 网格叠加 | 已完成 | 用于画面定位 |
@@ -168,6 +169,7 @@ deploy_windows.bat Release
 - **本地播放结束行为**：可选择 Play Once、Loop One、Loop All。
 - **状态显示**：状态栏会显示当前播放类型，例如 `Playing Local`、`Playing RTSP`、`Playing RTMP`、`Playing HLS` 或 `Playing DASH`。
 - **码率显示**：本地文件显示 `Avg Mbps`；RTSP 流在可用时显示测量到的 `RTP Mbps`；其他网络流显示解码后的 `Video Mbps`，它不一定等同于原始网络码率。
+- **RTSP 传输模式**：可在 Settings 中选择 Auto、TCP 或 UDP。TCP 通常更适合跨路由器或不稳定网络，UDP 在干净网络里可能延迟更低。
 - **主题**：可在 Settings 中选择 System、Light、Dark。
 
 ## 已测试流地址
@@ -218,6 +220,7 @@ HywelStarPlayer/
 
 ### Unreleased
 - 增加状态栏播放协议显示和更清晰的码率标签。
+- 增加 RTSP 传输模式设置，支持 Auto、TCP 和 UDP。
 
 ### v1.1.2 (Released 2026-08-02)
 - 增加 RTSP、RTMP、HLS、MPEG-DASH 已测试流地址说明。

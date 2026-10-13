@@ -28,6 +28,7 @@ public:
     QString getRecordingFormat() const;
     int getBufferSize() const;
     int getNetworkLatency() const;
+    QString getRtspTransportMode() const;
     bool getAutoPlayNext() const;
     int getLoopMode() const;
     QString getThemeMode() const;
@@ -38,6 +39,7 @@ public:
     void setRecordingFormat(const QString &format);
     void setBufferSize(int size);
     void setNetworkLatency(int latencyMs);
+    void setRtspTransportMode(const QString &mode);
     void setAutoPlayNext(bool enabled);
     void setLoopMode(int mode);
     void setThemeMode(const QString &mode);
@@ -52,6 +54,7 @@ private:
     QCheckBox *autoPlayNextCheck;
     QSpinBox *bufferSizeSpinBox;
     QSpinBox *networkLatencySpinBox;
+    QComboBox *rtspTransportCombo;
     QComboBox *themeCombo;
 
     // Recording settings

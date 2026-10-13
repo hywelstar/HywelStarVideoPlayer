@@ -177,6 +177,28 @@ QString bitrateTooltipForProtocol(PlaybackProtocol protocol) {
         return "Bitrate";
     }
 }
+
+RtspTransportMode rtspTransportModeFromString(const QString &mode) {
+    const QString normalized = mode.toLower();
+    if (normalized == "tcp") {
+        return RtspTransportMode::Tcp;
+    }
+    if (normalized == "udp") {
+        return RtspTransportMode::Udp;
+    }
+    return RtspTransportMode::Auto;
+}
+
+QString rtspTransportModeName(const QString &mode) {
+    const QString normalized = mode.toLower();
+    if (normalized == "tcp") {
+        return "TCP";
+    }
+    if (normalized == "udp") {
+        return "UDP";
+    }
+    return "Auto";
+}
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -398,6 +420,7 @@ void MainWindow::onShowSettings() {
     dialog.setScreenshotPath(recordingManager->getScreenshotPath());
     dialog.setRecordingFormat(settings.value("recordingFormat", "mkv").toString().toLower());
     dialog.setNetworkLatency(qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs));
+    dialog.setRtspTransportMode(settings.value("rtspTransportMode", "auto").toString());
     dialog.setThemeMode(settings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString());
 
     if (dialog.exec() == QDialog::Accepted) {
@@ -413,7 +436,13 @@ void MainWindow::onShowSettings() {
         const int networkLatency = qBound(kMinNetworkLatencyMs, dialog.getNetworkLatency(), kMaxNetworkLatencyMs);
         settings.setValue("networkLatency", networkLatency);
         gstreamerEngine->setNetworkLatency(networkLatency);
-        Logger::instance().info(QString("MainWindow: Settings updated (latency=%1 ms, format=%2)").arg(networkLatency).arg(dialog.getRecordingFormat()));
+        const QString rtspTransportMode = dialog.getRtspTransportMode();
+        settings.setValue("rtspTransportMode", rtspTransportMode);
+        gstreamerEngine->setRtspTransportMode(rtspTransportModeFromString(rtspTransportMode));
+        Logger::instance().info(QString("MainWindow: Settings updated (latency=%1 ms, rtspTransport=%2, format=%3)")
+                                .arg(networkLatency)
+                                .arg(rtspTransportModeName(rtspTransportMode))
+                                .arg(dialog.getRecordingFormat()));
     }
 }
 
@@ -882,6 +911,8 @@ void MainWindow::loadSettings() {
     // Network latency
     int networkLatency = qBound(kMinNetworkLatencyMs, settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(), kMaxNetworkLatencyMs);
     gstreamerEngine->setNetworkLatency(networkLatency);
+    const QString rtspTransportMode = settings.value("rtspTransportMode", "auto").toString();
+    gstreamerEngine->setRtspTransportMode(rtspTransportModeFromString(rtspTransportMode));
 
     // Recording paths
     QString recordingPath = settings.value("recordingPath", "").toString();
@@ -896,7 +927,10 @@ void MainWindow::loadSettings() {
     quickConnectBar->setLocalMode(localMode);
     setLocalFilePanelVisible(localMode);
 
-    Logger::instance().debug(QString("MainWindow: Settings loaded (volume=%1, latency=%2 ms)").arg(volume).arg(networkLatency));
+    Logger::instance().debug(QString("MainWindow: Settings loaded (volume=%1, latency=%2 ms, rtspTransport=%3)")
+                             .arg(volume)
+                             .arg(networkLatency)
+                             .arg(rtspTransportModeName(rtspTransportMode)));
 }
 
 void MainWindow::saveSettings() {

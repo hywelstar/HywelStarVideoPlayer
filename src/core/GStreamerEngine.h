@@ -29,6 +29,12 @@ enum class PlayerState {
     Error
 };
 
+enum class RtspTransportMode {
+    Auto,
+    Tcp,
+    Udp
+};
+
 struct StreamInfo {
     int width = 0;
     int height = 0;
@@ -50,6 +56,8 @@ public:
     void stop();
     void setVolume(int volume);
     void setNetworkLatency(int latencyMs);
+    void setRtspTransportMode(RtspTransportMode mode);
+    RtspTransportMode getRtspTransportMode() const;
     void setWindowHandle(WId windowId);
     void refreshVideo();
     void seek(qint64 positionMs);
@@ -161,10 +169,10 @@ private:
     WId windowHandle = 0;
     int currentVolume = 50;
     int networkLatencyMs = 200;
+    RtspTransportMode rtspTransportMode = RtspTransportMode::Auto;
     double currentPlaybackRate = 1.0;
     bool stretchVideoEnabled = false;
 };
 
 #endif // GSTREAMER_ENGINE_H
-
 

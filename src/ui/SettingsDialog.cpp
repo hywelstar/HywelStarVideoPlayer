@@ -92,13 +92,22 @@ void SettingsDialog::setupUI() {
     networkLatencySpinBox->setToolTip(tr("0 ms for lowest delay; increase when network jitter appears"));
     playbackGrid->addWidget(networkLatencySpinBox, 3, 1);
 
-    playbackGrid->addWidget(new QLabel(tr("Theme:")), 4, 0);
+    playbackGrid->addWidget(new QLabel(tr("RTSP Transport:")), 4, 0);
+    rtspTransportCombo = new QComboBox();
+    rtspTransportCombo->setMinimumHeight(kFieldHeight);
+    rtspTransportCombo->addItem(tr("Auto"), "auto");
+    rtspTransportCombo->addItem(tr("TCP"), "tcp");
+    rtspTransportCombo->addItem(tr("UDP"), "udp");
+    rtspTransportCombo->setToolTip(tr("TCP is often more stable across routers; UDP can be lower latency on clean networks"));
+    playbackGrid->addWidget(rtspTransportCombo, 4, 1);
+
+    playbackGrid->addWidget(new QLabel(tr("Theme:")), 5, 0);
     themeCombo = new QComboBox();
     themeCombo->setMinimumHeight(kFieldHeight);
     themeCombo->addItem(tr("System"), ThemeManager::modeToString(ThemeMode::System));
     themeCombo->addItem(tr("Light"), ThemeManager::modeToString(ThemeMode::Light));
     themeCombo->addItem(tr("Dark"), ThemeManager::modeToString(ThemeMode::Dark));
-    playbackGrid->addWidget(themeCombo, 4, 1);
+    playbackGrid->addWidget(themeCombo, 5, 1);
 
     playbackLayout->addWidget(playbackGroup);
     playbackLayout->addStretch();
@@ -183,6 +192,7 @@ void SettingsDialog::loadSettings() {
                                settings.value("networkLatency", kDefaultNetworkLatencyMs).toInt(),
                                kMaxNetworkLatencyMs);
     networkLatencySpinBox->setValue(latency);
+    setRtspTransportMode(settings.value("rtspTransportMode", "auto").toString());
     setThemeMode(settings.value("themeMode", ThemeManager::modeToString(ThemeMode::System)).toString());
 
     QString recordingFormat = settings.value("recordingFormat", "mkv").toString().toLower();
@@ -203,6 +213,7 @@ void SettingsDialog::saveSettings() {
     settings.setValue("bufferSize", bufferSizeSpinBox->value());
     settings.setValue("networkLatency",
                       qBound(kMinNetworkLatencyMs, networkLatencySpinBox->value(), kMaxNetworkLatencyMs));
+    settings.setValue("rtspTransportMode", getRtspTransportMode());
     settings.setValue("themeMode", getThemeMode());
 
     settings.setValue("recordingFormat", recordingFormatCombo->currentData().toString());
@@ -230,6 +241,11 @@ int SettingsDialog::getBufferSize() const {
 int SettingsDialog::getNetworkLatency() const {
     return networkLatencySpinBox->value();
 }
+
+QString SettingsDialog::getRtspTransportMode() const {
+    return rtspTransportCombo->currentData().toString();
+}
+
 bool SettingsDialog::getAutoPlayNext() const {
     return autoPlayNextCheck->isChecked();
 }
@@ -265,6 +281,12 @@ void SettingsDialog::setBufferSize(int size) {
 void SettingsDialog::setNetworkLatency(int latencyMs) {
     networkLatencySpinBox->setValue(qBound(kMinNetworkLatencyMs, latencyMs, kMaxNetworkLatencyMs));
 }
+
+void SettingsDialog::setRtspTransportMode(const QString &mode) {
+    const int index = rtspTransportCombo->findData(mode.toLower());
+    rtspTransportCombo->setCurrentIndex(index >= 0 ? index : 0);
+}
+
 void SettingsDialog::setAutoPlayNext(bool enabled) {
     autoPlayNextCheck->setChecked(enabled);
 }
@@ -277,7 +299,6 @@ void SettingsDialog::setThemeMode(const QString &mode) {
     const int index = themeCombo->findData(mode);
     themeCombo->setCurrentIndex(index >= 0 ? index : 0);
 }
-
 
 
 

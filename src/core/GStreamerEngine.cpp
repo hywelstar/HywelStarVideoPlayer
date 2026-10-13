@@ -20,6 +20,7 @@
 
 #ifndef ANDROID
 #include <gst/app/gstappsink.h>
+#include <gst/rtsp/gstrtsptransport.h>
 #include <gst/video/videooverlay.h>
 #endif
 
@@ -621,6 +622,25 @@ void GStreamerEngine::setNetworkLatency(int latencyMs) {
 #endif
 }
 
+void GStreamerEngine::setRtspTransportMode(RtspTransportMode mode) {
+    if (rtspTransportMode == mode) {
+        return;
+    }
+
+    rtspTransportMode = mode;
+    QString modeName = "Auto";
+    if (mode == RtspTransportMode::Tcp) {
+        modeName = "TCP";
+    } else if (mode == RtspTransportMode::Udp) {
+        modeName = "UDP";
+    }
+    Logger::instance().info(QString("GStreamerEngine: RTSP transport mode set to %1").arg(modeName));
+}
+
+RtspTransportMode GStreamerEngine::getRtspTransportMode() const {
+    return rtspTransportMode;
+}
+
 bool GStreamerEngine::startRecording(const QString &filepath) {
 #ifndef ANDROID
     if (!pipeline || isRecordingActive) {
@@ -1109,6 +1129,24 @@ void GStreamerEngine::sourceSetupCallback(GstElement *playbin, GstElement *sourc
     const gchar *sourceName = GST_OBJECT_NAME(source);
     Logger::instance().debug(QString("GStreamerEngine: source setup: %1")
                              .arg(sourceName ? QString::fromUtf8(sourceName) : QString("unknown")));
+
+    if (detectProtocol(engine->currentUri) == StreamProtocol::RTSP) {
+        GObjectClass *klass = G_OBJECT_GET_CLASS(source);
+        if (klass && g_object_class_find_property(klass, "protocols")) {
+            if (engine->rtspTransportMode == RtspTransportMode::Tcp) {
+                g_object_set(G_OBJECT(source), "protocols", GST_RTSP_LOWER_TRANS_TCP, nullptr);
+                Logger::instance().info("GStreamerEngine: RTSP source forced to TCP transport");
+            } else if (engine->rtspTransportMode == RtspTransportMode::Udp) {
+                g_object_set(G_OBJECT(source), "protocols", GST_RTSP_LOWER_TRANS_UDP, nullptr);
+                Logger::instance().info("GStreamerEngine: RTSP source forced to UDP transport");
+            } else {
+                Logger::instance().debug("GStreamerEngine: RTSP source using auto transport");
+            }
+        } else {
+            Logger::instance().warning("GStreamerEngine: RTSP source does not expose protocols property");
+        }
+    }
+
     g_signal_connect(source, "pad-added", G_CALLBACK(GStreamerEngine::rtpPadAddedCallback), engine);
 }
 
@@ -1793,7 +1831,6 @@ QString GStreamerEngine::buildPipeline(const QString &uri) {
     return "";
 #endif
 }
-
 
 
 
