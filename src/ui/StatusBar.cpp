@@ -81,13 +81,21 @@ void StatusBar::updateStreamInfo(int width, int height, int fps, int bitrate) {
     }
 
     if (bitrate > 0) {
-        bitrateLabel->setText(QString("%1 Mbps").arg(bitrate / 1000000.0, 0, 'f', 1));
+        bitrateLabel->setText(QString("%1 %2").arg(bitrate / 1000000.0, 0, 'f', 1).arg(bitrateMode));
         bitrateLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::currentPalette().success));
     } else {
-        bitrateLabel->setText("-- Mbps");
+        bitrateLabel->setText(QString("-- %1").arg(bitrateMode));
         bitrateLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::currentPalette().textSecondary));
     }
 
+}
+
+void StatusBar::updateBitrateMode(const QString &mode, const QString &tooltip) {
+    bitrateMode = mode.isEmpty() ? QString("Mbps") : mode;
+    bitrateLabel->setToolTip(tooltip.isEmpty() ? QString("Bitrate") : tooltip);
+    if (bitrateLabel->text().startsWith("--")) {
+        bitrateLabel->setText(QString("-- %1").arg(bitrateMode));
+    }
 }
 
 void StatusBar::updateLatency(int latencyMs) {

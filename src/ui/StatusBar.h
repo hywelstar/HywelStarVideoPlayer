@@ -21,6 +21,7 @@ public:
     StatusBar(QWidget *parent = nullptr);
 
     void updateStreamInfo(int width, int height, int fps, int bitrate);
+    void updateBitrateMode(const QString &mode, const QString &tooltip);
     void updateLatency(int latencyMs);
     void updateConnectionStatus(const QString &status);
     void updateRecordingStatus(bool recording);
@@ -41,6 +42,7 @@ private:
     QLabel *recordingLabel;
     QLabel *timeLabel;
     QList<QLabel *> separatorLabels;
+    QString bitrateMode = "Mbps";
 };
 
 #endif // STATUS_BAR_H

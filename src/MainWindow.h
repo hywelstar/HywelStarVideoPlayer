@@ -91,6 +91,8 @@ private:
     bool globalPointInVideo(const QPoint &globalPos) const;
     bool isOverlayObject(QObject *object) const;
     QString formatPlaybackTime(qint64 milliseconds) const;
+    QString playbackStatusText(const QString &stateText) const;
+    void setCurrentPlaybackProtocol(const QString &protocol, const QString &bitrateMode, const QString &bitrateTooltip);
 
     std::unique_ptr<VideoDisplayWidget> videoWidget;
     std::unique_ptr<ControlBar> controlBar;
@@ -117,6 +119,7 @@ private:
     PlaybackEndMode playbackEndMode = PlaybackEndMode::Stop;
     QString currentStreamUri;
     QString currentLocalFilePath;
+    QString currentPlaybackProtocol = "Local";
     bool currentPlaybackIsLocal = false;
     bool streamStoppedForPause = false;
     bool localEndHandled = false;

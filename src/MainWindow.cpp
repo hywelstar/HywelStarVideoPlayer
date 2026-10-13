@@ -41,6 +41,20 @@ constexpr int kMinNetworkLatencyMs = 0;
 constexpr int kMaxNetworkLatencyMs = 5000;
 constexpr int kDefaultNetworkLatencyMs = 0;
 
+enum class PlaybackProtocol {
+    Local,
+    RTSP,
+    UDP,
+    TCP,
+    HTTP,
+    RTMP,
+    SRT,
+    HLS,
+    DASH,
+    MJPEG,
+    Stream
+};
+
 bool isLocalFileUri(const QString &uri) {
     return uri.startsWith("file://", Qt::CaseInsensitive);
 }
@@ -60,6 +74,108 @@ bool isValidStreamUri(const QString &uri) {
            scheme == "http" || scheme == "https" ||
            scheme == "rtmp" || scheme == "rtmps" || scheme == "rtmpt" ||
            scheme == "srt" || scheme == "file";
+}
+
+PlaybackProtocol detectPlaybackProtocol(const QString &uri) {
+    const QUrl url(uri);
+    const QString scheme = url.scheme().toLower();
+    const QString path = url.path().toLower();
+
+    if (url.isLocalFile() || scheme == "file") {
+        return PlaybackProtocol::Local;
+    }
+    if (scheme == "rtsp") {
+        return PlaybackProtocol::RTSP;
+    }
+    if (scheme == "udp") {
+        return PlaybackProtocol::UDP;
+    }
+    if (scheme == "tcp") {
+        return PlaybackProtocol::TCP;
+    }
+    if (scheme == "rtmp" || scheme == "rtmps" || scheme == "rtmpt") {
+        return PlaybackProtocol::RTMP;
+    }
+    if (scheme == "srt") {
+        return PlaybackProtocol::SRT;
+    }
+    if (scheme == "http" || scheme == "https") {
+        if (path.endsWith(".m3u8")) {
+            return PlaybackProtocol::HLS;
+        }
+        if (path.endsWith(".mpd")) {
+            return PlaybackProtocol::DASH;
+        }
+        if (path.endsWith(".mjpg") || path.endsWith(".mjpeg") || uri.contains("mjpeg", Qt::CaseInsensitive)) {
+            return PlaybackProtocol::MJPEG;
+        }
+        return PlaybackProtocol::HTTP;
+    }
+    return PlaybackProtocol::Stream;
+}
+
+QString playbackProtocolName(PlaybackProtocol protocol) {
+    switch (protocol) {
+    case PlaybackProtocol::Local:
+        return "Local";
+    case PlaybackProtocol::RTSP:
+        return "RTSP";
+    case PlaybackProtocol::UDP:
+        return "UDP";
+    case PlaybackProtocol::TCP:
+        return "TCP";
+    case PlaybackProtocol::HTTP:
+        return "HTTP";
+    case PlaybackProtocol::RTMP:
+        return "RTMP";
+    case PlaybackProtocol::SRT:
+        return "SRT";
+    case PlaybackProtocol::HLS:
+        return "HLS";
+    case PlaybackProtocol::DASH:
+        return "DASH";
+    case PlaybackProtocol::MJPEG:
+        return "MJPEG";
+    case PlaybackProtocol::Stream:
+        return "Stream";
+    }
+    return "Stream";
+}
+
+QString bitrateModeForProtocol(PlaybackProtocol protocol) {
+    switch (protocol) {
+    case PlaybackProtocol::Local:
+        return "Avg Mbps";
+    case PlaybackProtocol::RTSP:
+        return "RTP Mbps";
+    case PlaybackProtocol::RTMP:
+    case PlaybackProtocol::SRT:
+    case PlaybackProtocol::HLS:
+    case PlaybackProtocol::DASH:
+    case PlaybackProtocol::HTTP:
+    case PlaybackProtocol::MJPEG:
+        return "Video Mbps";
+    default:
+        return "Mbps";
+    }
+}
+
+QString bitrateTooltipForProtocol(PlaybackProtocol protocol) {
+    switch (protocol) {
+    case PlaybackProtocol::Local:
+        return "Average media bitrate estimated from file size and duration";
+    case PlaybackProtocol::RTSP:
+        return "Measured RTP video bitrate";
+    case PlaybackProtocol::RTMP:
+    case PlaybackProtocol::SRT:
+    case PlaybackProtocol::HLS:
+    case PlaybackProtocol::DASH:
+    case PlaybackProtocol::HTTP:
+    case PlaybackProtocol::MJPEG:
+        return "Decoded video throughput, not necessarily network bitrate";
+    default:
+        return "Bitrate";
+    }
 }
 }
 
@@ -219,6 +335,10 @@ void MainWindow::onPlayUri(const QString &uri) {
         return;
     }
     Logger::instance().info(QString("MainWindow: Playing URI: %1").arg(uri));
+    const PlaybackProtocol protocol = detectPlaybackProtocol(uri);
+    setCurrentPlaybackProtocol(playbackProtocolName(protocol),
+                               bitrateModeForProtocol(protocol),
+                               bitrateTooltipForProtocol(protocol));
     currentStreamUri = uri;
     currentPlaybackIsLocal = false;
     currentLocalFilePath.clear();
@@ -262,6 +382,7 @@ void MainWindow::playLocalFilePath(const QString &filePath, bool restartPlayback
     localFileList->setNowPlayingFilePath(filePath);
     const QString uri = QUrl::fromLocalFile(filePath).toString();
     Logger::instance().info(QString("MainWindow: Playing local file: %1").arg(filePath));
+    setCurrentPlaybackProtocol("Local", "Avg Mbps", "Average media bitrate estimated from file size and duration");
     if (restartPlayback) {
         gstreamerEngine->restart(uri);
     } else {
@@ -312,6 +433,7 @@ void MainWindow::onPlayPause() {
             streamStoppedForPause = true;
             Logger::instance().info(QString("MainWindow: Stream pause requested, stopping live stream: %1").arg(currentStreamUri));
             gstreamerEngine->stop();
+            statusBar->updateConnectionStatus(playbackStatusText("Paused"));
         }
         controlBar->setPlaybackState(PlaybackState::Paused);
     } else if (streamStoppedForPause) {
@@ -518,11 +640,11 @@ void MainWindow::onPlayerStateChanged(int state) {
     PlayerState playerState = static_cast<PlayerState>(state);
     switch (playerState) {
     case PlayerState::Playing:
-        statusBar->updateConnectionStatus("Playing");
+        statusBar->updateConnectionStatus(playbackStatusText("Playing"));
         controlBar->setPlaybackState(PlaybackState::Playing);
         break;
     case PlayerState::Paused:
-        statusBar->updateConnectionStatus("Paused");
+        statusBar->updateConnectionStatus(playbackStatusText("Paused"));
         controlBar->setPlaybackState(PlaybackState::Paused);
         break;
     case PlayerState::Stopped:
@@ -957,4 +1079,18 @@ QString MainWindow::formatPlaybackTime(qint64 milliseconds) const {
     return QString("%1:%2")
         .arg(minutes, 2, 10, QChar('0'))
         .arg(seconds, 2, 10, QChar('0'));
+}
+
+QString MainWindow::playbackStatusText(const QString &stateText) const {
+    if (currentPlaybackProtocol.isEmpty()) {
+        return stateText;
+    }
+    return QString("%1 %2").arg(stateText, currentPlaybackProtocol);
+}
+
+void MainWindow::setCurrentPlaybackProtocol(const QString &protocol, const QString &bitrateMode, const QString &bitrateTooltip) {
+    currentPlaybackProtocol = protocol.isEmpty() ? QString("Stream") : protocol;
+    statusBar->updateBitrateMode(bitrateMode, bitrateTooltip);
+    statusBar->updateStreamInfo(0, 0, 0, 0);
+    Logger::instance().info(QString("MainWindow: Detected playback protocol: %1").arg(currentPlaybackProtocol));
 }
